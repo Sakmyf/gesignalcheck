@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Candado - The Guardian",
+  "version": "0.1.0",
+  "description": "Tu guardián digital. Analiza la veracidad y seguridad de la información en tiempo real.",
+  "permissions": ["activeTab", "storage", "scripting"],
+  "host_permissions": ["http://127.0.0.1:8787/*"],
+  "action": {
+    "default_title": "Verificar con Candado",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "service_worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content_script.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

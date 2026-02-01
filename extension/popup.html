@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; width: 320px; background-color: #f9f9f9; }
+      .container { padding: 15px; }
+      
+      /* Header con Semáforo */
+      .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+      .badge {
+        padding: 4px 12px;
+        border-radius: 12px;
+        color: white;
+        font-weight: bold;
+        font-size: 14px;
+        text-transform: uppercase;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+
+      /* Colores del Semáforo */
+      .bg-respaldado { background-color: #10B981; } /* Verde */
+      .bg-en_debate { background-color: #F59E0B; } /* Amarillo */
+      .bg-especulativo { background-color: #9CA3AF; } /* Gris */
+      .bg-contradicho { background-color: #EF4444; } /* Rojo */
+
+      /* Resumen */
+      #summary { font-size: 13px; color: #374151; line-height: 1.4; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+
+      /* Lista de Evidencias (Claims) */
+      .claims-title { font-size: 11px; font-weight: 700; color: #6B7280; text-transform: uppercase; margin-bottom: 5px; }
+      .claim-item { display: flex; align-items: flex-start; margin-bottom: 8px; font-size: 12px; color: #4B5563; }
+      .claim-dot { min-width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; margin-right: 8px; }
+      
+      .footer { font-size: 10px; color: #9CA3AF; text-align: center; margin-top: 10px; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <span style="font-weight: 700; color: #111;">Candado</span>
+        <span id="status-badge" class="badge bg-especulativo">...</span>
+      </div>
+      
+      <div id="summary">Analizando contenido...</div>
+      
+      <div class="claims-title">Evidencia Detectada</div>
+      <div id="claims-list"></div>
+      
+      <div class="footer">
+        Powered by Candado AI
+      </div>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>
