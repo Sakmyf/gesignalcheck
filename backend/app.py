@@ -1,10 +1,10 @@
 # ==============================================================================
 # CANDADO API - THE GUARDIAN (v0.1.2 - Intermedio)
-# Evidencias explícitas (evidence[]) + veto ético
 # ==============================================================================
 
-from fastapi import FastAPI, BackgroundTasks, Request, HTTPException
+from fastapi import FastAPI, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from datetime import datetime
 from typing import List, Optional
@@ -47,7 +47,7 @@ app.add_middleware(
 )
 
 # ------------------------------------------------------------------------------
-# Rate Limit Middleware (por IP)
+# Rate Limit Middleware (por IP) – CORRECTO (sin 500)
 # ------------------------------------------------------------------------------
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
@@ -56,14 +56,13 @@ async def rate_limit_middleware(request: Request, call_next):
 
     bucket = _rate_limit_buckets[client_ip]
 
-    # limpiar timestamps viejos
     while bucket and bucket[0] <= now - RATE_WINDOW:
         bucket.popleft()
 
     if len(bucket) >= RATE_LIMIT_RPS:
-        raise HTTPException(
+        return JSONResponse(
             status_code=429,
-            detail="Rate limit exceeded. Too many requests."
+            content={"detail": "Rate limit exceeded"}
         )
 
     bucket.append(now)
@@ -97,12 +96,12 @@ class VerifyResponse(BaseModel):
 # ------------------------------------------------------------------------------
 # Regex / Señales
 # ------------------------------------------------------------------------------
-REGEX_TRUST       = r'(?i)\b(cuit|cuil|raz[oó]n social|matr[ií]cula)\b'
-REGEX_LEGAL       = r'(?i)\b(t[eé]rminos|privacidad|legales|pol[ií]tica)\b'
-REGEX_EVENT       = r'(?i)\b(fecha|lugar|cronograma|se realizar[áa]|tendr[áa] lugar|entrada (libre|gratis))\b'
-REGEX_SPEC        = r'(?i)\b(podr[ií]a|ser[ií]a|estar[ií]a por|rumor|trascendi[óo]|proyecta)\b'
-REGEX_ALERT       = r'(?i)\b(estafa|engaño|falso|fake|alerta|urgente)\b'
-REGEX_MONEY       = r'(?i)\b(deposit[aá]|transfer[ií]|cbu|cvu|alias)\b'
+REGEX_TRUST = r'(?i)\b(cuit|cuil|raz[oó]n social|matr[ií]cula)\b'
+REGEX_LEGAL = r'(?i)\b(t[eé]rminos|privacidad|legales|pol[ií]tica)\b'
+REGEX_EVENT = r'(?i)\b(fecha|lugar|cronograma|se realizar[áa]|tendr[áa] lugar|entrada (libre|gratis))\b'
+REGEX_SPEC  = r'(?i)\b(podr[ií]a|ser[ií]a|estar[ií]a por|rumor|trascendi[óo]|proyecta)\b'
+REGEX_ALERT = r'(?i)\b(estafa|engaño|falso|fake|alerta|urgente)\b'
+REGEX_MONEY = r'(?i)\b(deposit[aá]|transfer[ií]|cbu|cvu|alias)\b'
 
 WHITELIST_OK = ["chequeado", "gob", "boletin", "who.int", "un.org"]
 
@@ -148,7 +147,7 @@ async def fetch_page_content(url: str) -> tuple[str, str]:
         return "", ""
 
 # ------------------------------------------------------------------------------
-# Motor de reglas + evidencias
+# Motor de reglas
 # ------------------------------------------------------------------------------
 def expert_rules_engine(text: str, url: str):
     score = 0
@@ -157,36 +156,28 @@ def expert_rules_engine(text: str, url: str):
 
     if re.search(REGEX_TRUST, text):
         score += 2
-        detected.append("Identidad verificable (CUIT / matrícula)")
+        detected.append("Identidad verificable")
 
     if re.search(REGEX_LEGAL, text):
         score += 1
-        detected.append("Documentación legal presente")
+        detected.append("Documentación legal")
 
     if "https://" in url:
         score += 1
-        detected.append("Conexión segura (HTTPS)")
-
-    event_hits = re.findall(REGEX_EVENT, text)
-    if event_hits:
-        score += min(3, 2 + (1 if len(event_hits) >= 2 else 0))
-        detected.append(f"Evento detectado ({len(event_hits)} pistas)")
+        detected.append("HTTPS")
 
     if re.search(REGEX_SPEC, text):
         score -= 2
-        detected.append("Lenguaje especulativo / rumor")
+        detected.append("Lenguaje especulativo")
 
     if re.search(REGEX_ALERT, text):
         score -= 2
-        detected.append("Lenguaje de alerta o fraude")
+        detected.append("Lenguaje de alerta")
 
-    has_money = re.search(REGEX_MONEY, text)
-    has_legal = re.search(REGEX_LEGAL, text)
-
-    if has_money and not has_legal:
+    if re.search(REGEX_MONEY, text) and not re.search(REGEX_LEGAL, text):
         score -= 5
         is_critical = True
-        detected.append("Solicitud de dinero o datos sin marco legal (CRÍTICO)")
+        detected.append("Solicitud de dinero sin respaldo legal")
 
     return score, detected, is_critical
 
@@ -222,61 +213,24 @@ async def verify(req: VerifyRequest, background_tasks: BackgroundTasks):
 
     points, reasons, is_critical = expert_rules_engine(clean_text, req.url)
 
-    evidence = []
-    for r in reasons:
-        if "CRÍTICO" in r:
-            evidence.append(f"⚠️ {r}")
-        elif r.lower().startswith(("lenguaje", "alerta")):
-            evidence.append(f"- {r}")
-        else:
-            evidence.append(f"+ {r}")
-
     if is_critical:
         label = "contradicho"
         score = 0.99
         method = "VETO_ETICO"
-        summary = "⚠️ Solicitud de dinero o datos sensibles sin respaldo legal."
+        summary = "Solicitud de dinero o datos sensibles sin respaldo legal."
     else:
         label, score = interpret_score(points)
         method = "expert_rules"
-        summary = (
-            "Análisis por reglas: " + ", ".join(reasons)
-            if reasons else
-            "Información insuficiente."
-        )
-
-        try:
-            domain = req.url.split("/")[2].lower()
-            if any(w in domain for w in WHITELIST_OK):
-                label = "respaldado"
-                score = max(score, 0.90)
-                method = "WHITELIST_BOOST"
-        except Exception:
-            pass
-
-    claims = []
-    for s in clean_text.split("."):
-        s = s.strip()
-        if not s:
-            continue
-        claims.append(Claim(
-            text=s,
-            label=label,
-            evidence_strength="media",
-            risk_if_wrong="medio"
-        ))
-        if len(claims) >= 5:
-            break
-
-    print(f"[AUDIT] {req.url} -> {label} ({score}) [{method}] {time.time()-t0:.2f}s")
+        summary = "Análisis por reglas."
 
     return VerifyResponse(
         label=label,
         score=score,
         summary=summary,
-        evidence=evidence,
-        claims=claims,
+        evidence=reasons,
+        claims=[],
         method=method,
         timestamp=datetime.utcnow().isoformat() + "Z",
         version=app.version
     )
+
