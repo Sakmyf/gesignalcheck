@@ -17,7 +17,7 @@ import httpx
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
-# 🔹 IMPORT DEL MOTOR NUEVO
+# 🔹 IMPORT DEL MOTOR NUEVO (OK)
 from rules.engine import analyze_text
 
 # ------------------------------------------------------------------------------
@@ -199,7 +199,6 @@ async def health():
 
 @app.post("/v1/verify", response_model=VerifyResponse)
 async def verify(req: VerifyRequest, background_tasks: BackgroundTasks):
-    t0 = time.time()
     text = req.text or ""
 
     if len(text) < 200 and req.url:
@@ -240,3 +239,4 @@ async def verify(req: VerifyRequest, background_tasks: BackgroundTasks):
         timestamp=datetime.utcnow().isoformat() + "Z",
         version=app.version
     )
+
