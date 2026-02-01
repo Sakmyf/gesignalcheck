@@ -17,6 +17,9 @@ import httpx
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
+# 🔹 IMPORT DEL MOTOR NUEVO
+from rules.engine import analyze_text
+
 # ------------------------------------------------------------------------------
 # .env
 # ------------------------------------------------------------------------------
@@ -47,7 +50,7 @@ app.add_middleware(
 )
 
 # ------------------------------------------------------------------------------
-# Rate Limit Middleware (por IP) – CORRECTO (sin 500)
+# Rate Limit Middleware (por IP)
 # ------------------------------------------------------------------------------
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
@@ -98,12 +101,9 @@ class VerifyResponse(BaseModel):
 # ------------------------------------------------------------------------------
 REGEX_TRUST = r'(?i)\b(cuit|cuil|raz[oó]n social|matr[ií]cula)\b'
 REGEX_LEGAL = r'(?i)\b(t[eé]rminos|privacidad|legales|pol[ií]tica)\b'
-REGEX_EVENT = r'(?i)\b(fecha|lugar|cronograma|se realizar[áa]|tendr[áa] lugar|entrada (libre|gratis))\b'
 REGEX_SPEC  = r'(?i)\b(podr[ií]a|ser[ií]a|estar[ií]a por|rumor|trascendi[óo]|proyecta)\b'
 REGEX_ALERT = r'(?i)\b(estafa|engaño|falso|fake|alerta|urgente)\b'
 REGEX_MONEY = r'(?i)\b(deposit[aá]|transfer[ií]|cbu|cvu|alias)\b'
-
-WHITELIST_OK = ["chequeado", "gob", "boletin", "who.int", "un.org"]
 
 SAFE_GREEN_MIN = 3
 DEBATE_MIN = 1
@@ -147,7 +147,7 @@ async def fetch_page_content(url: str) -> tuple[str, str]:
         return "", ""
 
 # ------------------------------------------------------------------------------
-# Motor de reglas
+# Motor viejo (expert_rules)
 # ------------------------------------------------------------------------------
 def expert_rules_engine(text: str, url: str):
     score = 0
@@ -211,26 +211,32 @@ async def verify(req: VerifyRequest, background_tasks: BackgroundTasks):
 
     clean_text = sanitize_for_privacy(text)
 
+    # Motor viejo
     points, reasons, is_critical = expert_rules_engine(clean_text, req.url)
 
     if is_critical:
         label = "contradicho"
-        score = 0.99
+        base_score = 0.99
         method = "VETO_ETICO"
         summary = "Solicitud de dinero o datos sensibles sin respaldo legal."
     else:
-        label, score = interpret_score(points)
+        label, base_score = interpret_score(points)
         method = "expert_rules"
         summary = "Análisis por reglas."
 
+    # Motor nuevo
+    rule_analysis = analyze_text(clean_text)
+
+    final_score = min(base_score + rule_analysis.score, 1.0)
+    final_evidence = reasons + rule_analysis.evidence
+
     return VerifyResponse(
         label=label,
-        score=score,
+        score=final_score,
         summary=summary,
-        evidence=reasons,
+        evidence=final_evidence,
         claims=[],
-        method=method,
+        method=f"{method} + rule_engine_v1",
         timestamp=datetime.utcnow().isoformat() + "Z",
         version=app.version
     )
-
