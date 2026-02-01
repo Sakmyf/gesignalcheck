@@ -14,7 +14,6 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import List, Optional
 from collections import defaultdict, deque
-import os
 import re
 import time
 
@@ -22,7 +21,7 @@ import httpx
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
-# 🔹 IMPORT DEL MOTOR NUEVO (OK)
+# 🔹 IMPORT DEL MOTOR NUEVO
 from rules.engine import analyze_text
 
 # ------------------------------------------------------------------------------
@@ -122,17 +121,23 @@ def sanitize_for_privacy(txt: str) -> str:
     return txt
 
 # ------------------------------------------------------------------------------
-# HTTP Client
+# HTTP Client (CORRECTO PARA RAILWAY)
 # ------------------------------------------------------------------------------
-http_client = httpx.AsyncClient(
-    timeout=10.0,
-    follow_redirects=True,
-    headers={"User-Agent": "CandadoGuardian/1.0"}
-)
+http_client: Optional[httpx.AsyncClient] = None
+
+@app.on_event("startup")
+async def startup():
+    global http_client
+    http_client = httpx.AsyncClient(
+        timeout=10.0,
+        follow_redirects=True,
+        headers={"User-Agent": "CandadoGuardian/1.0"}
+    )
 
 @app.on_event("shutdown")
 async def shutdown():
-    await http_client.aclose()
+    if http_client:
+        await http_client.aclose()
 
 async def fetch_page_content(url: str) -> tuple[str, str]:
     try:
@@ -244,4 +249,3 @@ async def verify(req: VerifyRequest, background_tasks: BackgroundTasks):
         timestamp=datetime.utcnow().isoformat() + "Z",
         version=app.version
     )
-
