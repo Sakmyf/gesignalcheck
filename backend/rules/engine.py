@@ -1,32 +1,16 @@
-from typing import List
-
-from .urgency import check_urgency
-from .promises import check_promises
-from .emotions import check_emotions
-
-
-class RuleResult:
-    def __init__(self, score: float = 0.0, evidence: List[str] = None):
-        self.score = score
-        self.evidence = evidence or []
-
-    def merge(self, other: "RuleResult"):
-        self.score += other.score
-        self.evidence.extend(other.evidence)
-
+# rules/engine.py
+from rules.types import RuleResult
+from rules.urgency import check_urgency
+from rules.promises import check_promises
+from rules.emotions import check_emotions
 
 def analyze_text(text: str) -> RuleResult:
-    result = RuleResult()
+    score = 0.0
+    evidence = []
 
-    for rule in (check_urgency, check_promises, check_emotions):
-        result.merge(rule(text))
+    for fn in (check_urgency, check_promises, check_emotions):
+        result = fn(text)
+        score += result.score
+        evidence.extend(result.evidence)
 
-    if (
-        "urgency_language" in result.evidence
-        and "exaggerated_promises" in result.evidence
-    ):
-        result.score += 0.10
-        result.evidence.append("high_risk_combination")
-
-    return result
-
+    return RuleResult(score=score, evidence=evidence)
