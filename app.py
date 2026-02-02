@@ -1,8 +1,3 @@
-import sys
-import os
-
-sys.path.append(os.path.dirname(__file__))
-
 # ==============================================================================
 # CANDADO API - THE GUARDIAN (v0.1.2 - Intermedio)
 # ==============================================================================
@@ -16,13 +11,14 @@ from typing import List, Optional
 from collections import defaultdict, deque
 import re
 import time
+import os
 
 import httpx
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
-# 🔹 IMPORT DEL MOTOR NUEVO
-from rules.engine import analyze_text
+# 🔹 IMPORT CORRECTO DEL MOTOR (sin sys.path hacks)
+from backend.rules.engine import analyze_text
 
 # ------------------------------------------------------------------------------
 # .env
@@ -30,10 +26,12 @@ from rules.engine import analyze_text
 load_dotenv()
 
 ALLOWED_ORIGINS = [
-    o.strip() for o in os.getenv(
+    o.strip()
+    for o in os.getenv(
         "ALLOWED_ORIGINS",
         "http://127.0.0.1:8787,http://localhost:8787"
-    ).split(",") if o.strip()
+    ).split(",")
+    if o.strip()
 ]
 
 RATE_LIMIT_RPS = int(os.getenv("RATE_LIMIT_RPS", "2"))
@@ -43,7 +41,10 @@ _rate_limit_buckets = defaultdict(lambda: deque())
 # ------------------------------------------------------------------------------
 # App
 # ------------------------------------------------------------------------------
-app = FastAPI(title="Candado API", version="0.1.2-guardian-intermedio")
+app = FastAPI(
+    title="Candado API",
+    version="0.1.2-guardian-intermedio"
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -84,11 +85,13 @@ class Claim(BaseModel):
     evidence_strength: str
     risk_if_wrong: str
 
+
 class VerifyRequest(BaseModel):
     url: str
     title: Optional[str] = None
     text: Optional[str] = None
     locale: Optional[str] = "es-AR"
+
 
 class VerifyResponse(BaseModel):
     label: str
@@ -116,12 +119,17 @@ DEBATE_MIN = 1
 # Helpers
 # ------------------------------------------------------------------------------
 def sanitize_for_privacy(txt: str) -> str:
-    txt = re.sub(r'[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}', '[email]', txt, flags=re.I)
+    txt = re.sub(
+        r'[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}',
+        '[email]',
+        txt,
+        flags=re.I
+    )
     txt = re.sub(r'\b\d{20,22}\b', '[cbu]', txt)
     return txt
 
 # ------------------------------------------------------------------------------
-# HTTP Client (CORRECTO PARA RAILWAY)
+# HTTP Client (Railway safe)
 # ------------------------------------------------------------------------------
 http_client: Optional[httpx.AsyncClient] = None
 
@@ -143,8 +151,8 @@ async def fetch_page_content(url: str) -> tuple[str, str]:
     try:
         r = await http_client.get(url)
         r.raise_for_status()
-        soup = BeautifulSoup(r.text, "html.parser")
 
+        soup = BeautifulSoup(r.text, "html.parser")
         title = soup.title.string.strip() if soup.title and soup.title.string else ""
         body = soup.body or soup
 
@@ -172,7 +180,7 @@ def expert_rules_engine(text: str, url: str):
         score += 1
         detected.append("Documentación legal")
 
-    if "https://" in url:
+    if url.startswith("https://"):
         score += 1
         detected.append("HTTPS")
 
@@ -203,6 +211,10 @@ def interpret_score(pts: int):
 # ------------------------------------------------------------------------------
 # Endpoints
 # ------------------------------------------------------------------------------
+@app.get("/")
+async def root():
+    return {"service": "Candado API", "status": "running"}
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "version": app.version}
@@ -220,7 +232,6 @@ async def verify(req: VerifyRequest, background_tasks: BackgroundTasks):
 
     clean_text = sanitize_for_privacy(text)
 
-    # Motor viejo
     points, reasons, is_critical = expert_rules_engine(clean_text, req.url)
 
     if is_critical:
@@ -233,7 +244,6 @@ async def verify(req: VerifyRequest, background_tasks: BackgroundTasks):
         method = "expert_rules"
         summary = "Análisis por reglas."
 
-    # Motor nuevo
     rule_analysis = analyze_text(clean_text)
 
     final_score = min(base_score + rule_analysis.score, 1.0)
