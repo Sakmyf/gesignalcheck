@@ -1,5 +1,5 @@
-# rules/urgency.py
-from rules.types import RuleResult
+# urgency.py
+from types import RuleResult
 
 def check_urgency(text: str) -> RuleResult:
     score = 0.0

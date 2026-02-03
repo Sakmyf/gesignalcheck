@@ -1,4 +1,4 @@
-# rules/types.py
+# types.py
 from dataclasses import dataclass
 from typing import List
 
