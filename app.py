@@ -14,9 +14,9 @@ import httpx
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
-# ---------------------------------------------------------------------
+# =========================================================
 # ENV
-# ---------------------------------------------------------------------
+# =========================================================
 load_dotenv()
 
 ALLOWED_ORIGINS = [
@@ -30,12 +30,12 @@ RATE_LIMIT_RPS = int(os.getenv("RATE_LIMIT_RPS", "2"))
 RATE_WINDOW = 1.0
 _rate_limit_buckets = defaultdict(lambda: deque())
 
-# ---------------------------------------------------------------------
+# =========================================================
 # APP
-# ---------------------------------------------------------------------
+# =========================================================
 app = FastAPI(
     title="Candado API",
-    version="0.1.3-railway-safe"
+    version="0.1.4-railway-stable"
 )
 
 app.add_middleware(
@@ -46,9 +46,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------------------------------------------------------------------
+# =========================================================
 # RATE LIMIT
-# ---------------------------------------------------------------------
+# =========================================================
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     ip = request.client.host if request.client else "unknown"
@@ -67,9 +67,9 @@ async def rate_limit_middleware(request: Request, call_next):
     bucket.append(now)
     return await call_next(request)
 
-# ---------------------------------------------------------------------
+# =========================================================
 # MODELS
-# ---------------------------------------------------------------------
+# =========================================================
 class Claim(BaseModel):
     text: str
     label: str
@@ -94,18 +94,18 @@ class VerifyResponse(BaseModel):
     timestamp: str
     version: str
 
-# ---------------------------------------------------------------------
+# =========================================================
 # REGEX SIGNALS
-# ---------------------------------------------------------------------
+# =========================================================
 REGEX_TRUST = r'(?i)\b(cuit|cuil|raz[oó]n social|matr[ií]cula)\b'
 REGEX_LEGAL = r'(?i)\b(t[eé]rminos|privacidad|legales|pol[ií]tica)\b'
 REGEX_SPEC  = r'(?i)\b(podr[ií]a|ser[ií]a|rumor|trascendi[óo]|proyecta)\b'
 REGEX_ALERT = r'(?i)\b(estafa|engaño|falso|fake|alerta|urgente)\b'
 REGEX_MONEY = r'(?i)\b(deposit[aá]|transfer[ií]|cbu|cvu|alias)\b'
 
-# ---------------------------------------------------------------------
+# =========================================================
 # HELPERS
-# ---------------------------------------------------------------------
+# =========================================================
 def sanitize_for_privacy(text: str) -> str:
     text = re.sub(
         r'[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}',
@@ -140,12 +140,21 @@ async def fetch_page_content(url: str) -> tuple[str, str]:
     except Exception:
         return "", ""
 
-# ---------------------------------------------------------------------
-# RULE ENGINE (LOCAL)
-# ---------------------------------------------------------------------
-from engine import analyze_text
+# =========================================================
+# AI / ENGINE (SAFE IMPORT)
+# =========================================================
+try:
+    from engine import analyze_text
+except Exception:
+    def analyze_text(text: str):
+        class Dummy:
+            score = 0.0
+            evidence = []
+        return Dummy()
 
-
+# =========================================================
+# RULE ENGINE (INLINE, SAFE)
+# =========================================================
 def expert_rules_engine(text: str, url: str):
     score = 0
     reasons = []
@@ -188,9 +197,9 @@ def interpret_score(score: int):
         return "especulativo", 0.42
     return "contradicho", 0.22
 
-# ---------------------------------------------------------------------
+# =========================================================
 # ENDPOINTS
-# ---------------------------------------------------------------------
+# =========================================================
 @app.get("/health")
 def health():
     return {
@@ -227,11 +236,11 @@ async def verify(req: VerifyRequest):
 
     return VerifyResponse(
         label=label,
-        score=min(base_score + ai.score, 1.0),
+        score=min(base_score + getattr(ai, "score", 0.0), 1.0),
         summary=summary,
-        evidence=reasons + ai.evidence,
+        evidence=reasons + getattr(ai, "evidence", []),
         claims=[],
-        method=f"{method} + rule_engine_v1",
+        method=f"{method} + guardian_v1",
         timestamp=datetime.utcnow().isoformat() + "Z",
         version=app.version
     )
