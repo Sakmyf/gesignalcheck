@@ -1,12 +1,14 @@
 # urgency.py
-from types import RuleResult
+import re
+from rules_types import RuleResult
+
+URGENCY_PATTERNS = r"(urgente|última oportunidad|actuá ahora|inmediato)"
 
 def check_urgency(text: str) -> RuleResult:
-    score = 0.0
-    evidence = []
-
-    if "urgente" in text.lower():
-        score += 0.2
-        evidence.append("Lenguaje de urgencia detectado")
-
-    return RuleResult(score=score, evidence=evidence)
+    if re.search(URGENCY_PATTERNS, text, re.I):
+        return RuleResult(
+            points=-0.3,
+            reasons=["urgency_pressure"],
+            evidence=["Lenguaje de urgencia detectado"]
+        )
+    return RuleResult()

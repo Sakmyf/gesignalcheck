@@ -4,6 +4,7 @@ from urgency import check_urgency
 from promises import check_promises
 from emotions import check_emotions
 
+
 def analyze_text(text: str) -> RuleResult:
     results = [
         check_urgency(text),
@@ -16,6 +17,7 @@ def analyze_text(text: str) -> RuleResult:
     for r in results:
         total.points += r.points
         total.reasons.extend(r.reasons)
+        total.evidence.extend(r.evidence)
         if r.critical:
             total.critical = True
 

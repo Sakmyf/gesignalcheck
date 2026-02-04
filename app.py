@@ -1,3 +1,4 @@
+# app.py
 import os
 import re
 import time
@@ -13,6 +14,9 @@ from pydantic import BaseModel
 import httpx
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+
+# IMPORT CLARO Y DIRECTO (sin stdlib conflicts)
+from engine import analyze_text
 
 # ---------------------------------------------------------------------
 # ENV
@@ -37,7 +41,7 @@ _rate_limit_buckets = defaultdict(lambda: deque())
 # ---------------------------------------------------------------------
 app = FastAPI(
     title="Candado API",
-    version="0.1.3-railway-stable"
+    version="0.1.5-railway-final"
 )
 
 app.add_middleware(
@@ -49,7 +53,7 @@ app.add_middleware(
 )
 
 # ---------------------------------------------------------------------
-# RATE LIMIT MIDDLEWARE
+# RATE LIMIT
 # ---------------------------------------------------------------------
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
@@ -143,11 +147,8 @@ async def fetch_page_content(url: str) -> tuple[str, str]:
         return "", ""
 
 # ---------------------------------------------------------------------
-# RULE ENGINE (LOCAL – SAFE IMPORT)
+# RULE ENGINE (LOCAL – SIMPLE Y ROBUSTO)
 # ---------------------------------------------------------------------
-from engine import analyze_text
-
-
 def expert_rules_engine(text: str, url: str):
     score = 0
     reasons = []
@@ -229,11 +230,11 @@ async def verify(req: VerifyRequest):
 
     return VerifyResponse(
         label=label,
-        score=min(base_score + ai.score, 1.0),
+        score=min(base_score + ai.points, 1.0),
         summary=summary,
-        evidence=reasons + ai.evidence,
+        evidence=reasons + ai.reasons,
         claims=[],
-        method=f"{method} + rule_engine_v1",
+        method=f"{method} + ai_engine",
         timestamp=datetime.utcnow().isoformat() + "Z",
         version=app.version
     )
