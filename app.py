@@ -194,13 +194,16 @@ def interpret_score(score: int):
 # ---------------------------------------------------------------------
 # ENDPOINTS
 # ---------------------------------------------------------------------
+@app.get("/")
+def root():
+    return {"status": "Candado API online"}
+
 @app.get("/health")
 def health():
     return {
         "status": "ok",
         "version": app.version
     }
-
 
 @app.post("/v1/verify", response_model=VerifyResponse)
 async def verify(req: VerifyRequest):
