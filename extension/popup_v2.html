@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>SignalCheck</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      width: 320px;
+      padding: 15px;
+      background: #f4f6f8;
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 18px;
+      margin: 0 0 10px 0;
+      color: #1e2a38;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 15px;
+    }
+
+    .badge {
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      display: inline-block;
+      margin-bottom: 10px;
+    }
+
+    .score {
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+
+    .confidence-container {
+      width: 100%;
+      height: 8px;
+      background: #ddd;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .confidence-bar {
+      height: 100%;
+      width: 0%;
+      transition: width 0.4s ease;
+      background: linear-gradient(90deg, #4caf50, #2e7d32);
+    }
+
+    .signals {
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+
+    .signals ul {
+      padding-left: 18px;
+      margin: 5px 0;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      background: linear-gradient(90deg, #29b6f6, #0288d1);
+      color: white;
+      font-size: 13px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .error {
+      display: none;
+      color: #c62828;
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+
+  </style>
+</head>
+<body>
+
+  <h1>SignalCheck</h1>
+  <div class="subtitle">Análisis contextual de la información</div>
+
+  <div id="labelBadge" class="badge">Esperando análisis...</div>
+
+  <div class="score">
+    Puntaje: <span id="scoreValue">0</span>
+  </div>
+
+  <div class="confidence-container">
+    <div id="confidenceBar" class="confidence-bar"></div>
+  </div>
+
+  <div class="signals">
+    <strong>Señales detectadas:</strong>
+    <ul id="signalsList">
+      <li>Ninguna aún</li>
+    </ul>
+  </div>
+
+  <div id="error" class="error"></div>
+
+  <button id="analyzeBtn">Analizar página</button>
+
+  <script src="popup.js"></script>
+
+</body>
+</html>
