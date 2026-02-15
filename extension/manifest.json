@@ -1,16 +1,17 @@
 {
   "manifest_version": 3,
   "name": "SignalCheck",
-  "version": "0.1.8",
-  "description": "Assists critical reading by detecting contextual signals in online content. Does not determine truth or falsity.",
+  "version": "0.2.0",
+  "description": "Enterprise contextual analysis engine. Detects structural trust and rhetorical manipulation signals. Does not determine truth or falsity.",
 
   "action": {
-    "default_popup": "popup_v2.html",
-    "default_title": "SignalCheck — contextual analysis"
+    "default_popup": "popup.html",
+    "default_title": "SignalCheck — Enterprise Contextual Analysis"
   },
 
   "background": {
-    "service_worker": "service_worker.js"
+    "service_worker": "service_worker.js",
+    "type": "module"
   },
 
   "permissions": [
@@ -20,7 +21,8 @@
   ],
 
   "host_permissions": [
-    "<all_urls>"
+    "<all_urls>",
+    "https://ge-signal-check-production.up.railway.app/*"
   ],
 
   "content_scripts": [

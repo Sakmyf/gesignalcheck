@@ -1,25 +1,12 @@
 // service_worker.js
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+// Worker mínimo para MV3.
+// No hace fetch.
+// Solo mantiene el contexto activo sin errores.
 
-  if (request.action === "analyze") {
+console.log("SignalCheck service worker initialized");
 
-    fetch("https://gesignalcheck-production-91c9.up.railway.app/v1/verify", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        url: request.url,
-        text: request.text,
-        page_type: "unknown"
-      })
-    })
-    .then(response => response.json())
-    .then(data => sendResponse(data))
-    .catch(() => sendResponse({ error: "API connection failed" }));
-
-    return true;
-  }
-
+// Opcional: evento de instalación
+chrome.runtime.onInstalled.addListener(() => {
+  console.log("SignalCheck extension installed/updated");
 });

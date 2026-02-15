@@ -6,7 +6,7 @@ body {
 
 .signal-popup {
   font-family: 'Segoe UI', sans-serif;
-  width: 300px;
+  width: 320px;
   padding: 16px;
   border-radius: 12px;
   background: #ffffff;
@@ -16,7 +16,13 @@ body {
 .signal-title {
   font-size: 18px;
   font-weight: 700;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.signal-subtitle {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 12px;
 }
 
 .signal-label {
@@ -25,7 +31,9 @@ body {
   font-size: 13px;
   font-weight: 600;
   display: inline-block;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  background: #cccccc;
+  color: white;
 }
 
 .confidence-bar-container {
@@ -34,7 +42,7 @@ body {
   background: #e6e6e6;
   border-radius: 6px;
   overflow: hidden;
-  margin: 8px 0 12px 0;
+  margin-bottom: 12px;
 }
 
 .confidence-bar {
@@ -48,6 +56,24 @@ body {
   margin-bottom: 12px;
 }
 
+.signals {
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.signals ul {
+  padding-left: 18px;
+  margin: 5px 0;
+}
+
+.error {
+  display: none;
+  color: #c62828;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+/* Botón */
 .signal-btn {
   width: 100%;
   background: linear-gradient(135deg, #4da3ff, #2b7de9);
@@ -64,4 +90,30 @@ body {
 .signal-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 18px rgba(43, 125, 233, 0.4);
+}
+
+/* Estados de riesgo */
+
+.risk-low {
+  background: #4caf50;
+}
+
+.risk-medium {
+  background: #ff9800;
+}
+
+.risk-high {
+  background: #f44336;
+}
+
+.bar-low {
+  background: linear-gradient(90deg, #4caf50, #2e7d32);
+}
+
+.bar-medium {
+  background: linear-gradient(90deg, #ff9800, #ef6c00);
+}
+
+.bar-high {
+  background: linear-gradient(90deg, #f44336, #b71c1c);
 }

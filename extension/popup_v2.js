@@ -1,104 +1,141 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>SignalCheck</title>
-  <style>
-    body {
-      width: 320px;
-      padding: 15px;
-      font-family: Arial, sans-serif;
-      background: #f4f6f9;
+document.addEventListener("DOMContentLoaded", () => {
+
+  const analyzeBtn = document.getElementById("analyzeBtn");
+  const scoreValue = document.getElementById("scoreValue");
+  const confidenceBar = document.getElementById("confidenceBar");
+  const signalsList = document.getElementById("signalsList");
+  const labelBadge = document.getElementById("labelBadge");
+  const errorDiv = document.getElementById("error");
+
+  const API_URL = "https://ge-signal-check-production.up.railway.app/v3/verify";
+
+  analyzeBtn.addEventListener("click", async () => {
+
+    resetUI();
+
+    try {
+
+      // 1️⃣ Obtener pestaña activa
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+
+      if (!tabs || tabs.length === 0) {
+        showError("No se encontró pestaña activa.");
+        return;
+      }
+
+      const tab = tabs[0];
+
+      if (!tab.id) {
+        showError("ID de pestaña inválido.");
+        return;
+      }
+
+      // 2️⃣ Extraer texto desde content_script
+      const response = await chrome.tabs.sendMessage(tab.id, { action: "extractText" });
+
+      if (!response || !response.text || response.text.length < 50) {
+        showError("No se pudo extraer texto significativo.");
+        return;
+      }
+
+      // 3️⃣ Obtener ID real de la extensión (seguridad)
+      const extensionId = chrome.runtime.id;
+
+      if (!extensionId) {
+        showError("No se pudo obtener ID de extensión.");
+        return;
+      }
+
+      // 4️⃣ Llamada al backend
+      const apiResponse = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-extension-id": extensionId
+        },
+        body: JSON.stringify({
+          url: response.url,
+          text: response.text
+        })
+      });
+
+      if (!apiResponse.ok) {
+        const errorText = await apiResponse.text();
+        console.error("HTTP ERROR:", apiResponse.status, errorText);
+        showError("Error del servidor (" + apiResponse.status + ")");
+        return;
+      }
+
+      const data = await apiResponse.json();
+      updateUI(data);
+
+    } catch (error) {
+      console.error("Error general:", error);
+      showError("Error en la comunicación con el servidor.");
     }
 
-    h2 {
-      margin: 0 0 5px 0;
+  });
+
+  // ----------------------------------------
+  // UI FUNCTIONS
+  // ----------------------------------------
+
+  function resetUI() {
+    errorDiv.style.display = "none";
+    labelBadge.textContent = "Analizando...";
+    labelBadge.className = "signal-label";
+    scoreValue.textContent = "0.00";
+    confidenceBar.style.width = "0%";
+    confidenceBar.className = "confidence-bar";
+    signalsList.innerHTML = "<li>Procesando...</li>";
+  }
+
+  function updateUI(data) {
+
+    if (!data || typeof data.risk_index !== "number") {
+      showError("Respuesta inválida del servidor.");
+      return;
     }
 
-    p {
-      font-size: 13px;
-      margin: 0 0 10px 0;
-      color: #555;
+    const risk = Math.max(0, Math.min(1, data.risk_index));
+
+    scoreValue.textContent = risk.toFixed(2);
+    confidenceBar.style.width = (risk * 100) + "%";
+
+    signalsList.innerHTML = "";
+
+    const signals = data?.details?.rhetorical_signals || [];
+
+    if (signals.length > 0) {
+      signals.forEach(signal => {
+        const li = document.createElement("li");
+        li.textContent = signal;
+        signalsList.appendChild(li);
+      });
+    } else {
+      signalsList.innerHTML = "<li>No se detectaron señales relevantes</li>";
     }
 
-    .error {
-      color: #d32f2f;
-      margin: 10px 0;
-      font-size: 13px;
+    if (risk < 0.35) {
+      labelBadge.textContent = "Riesgo Bajo";
+      labelBadge.classList.add("risk-low");
+      confidenceBar.classList.add("bar-low");
+    } else if (risk < 0.65) {
+      labelBadge.textContent = "Riesgo Medio";
+      labelBadge.classList.add("risk-medium");
+      confidenceBar.classList.add("bar-medium");
+    } else {
+      labelBadge.textContent = "Riesgo Alto";
+      labelBadge.classList.add("risk-high");
+      confidenceBar.classList.add("bar-high");
     }
+  }
 
-    .result {
-      margin-top: 15px;
-      font-size: 13px;
-    }
+  function showError(message) {
+    errorDiv.textContent = message;
+    errorDiv.style.display = "block";
+    labelBadge.textContent = "Error";
+    labelBadge.className = "signal-label";
+  }
 
-    .status {
-      padding: 8px;
-      border-radius: 6px;
-      text-align: center;
-      font-weight: bold;
-      margin-bottom: 8px;
-    }
-
-    .green {
-      background-color: #e8f5e9;
-      color: #2e7d32;
-    }
-
-    .yellow {
-      background-color: #fff8e1;
-      color: #ef6c00;
-    }
-
-    .red {
-      background-color: #ffebee;
-      color: #c62828;
-    }
-
-    button {
-      width: 100%;
-      padding: 10px;
-      border: none;
-      border-radius: 8px;
-      background: #1e88e5;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      margin-top: 10px;
-    }
-
-    button:hover {
-      background: #1565c0;
-    }
-
-    button:active {
-      transform: scale(0.98);
-    }
-
-    ul {
-      padding-left: 18px;
-      margin: 5px 0 0 0;
-    }
-  </style>
-</head>
-<body>
-
-  <h2>SignalCheck</h2>
-  <p>Análisis contextual de la información</p>
-
-  <div id="error" class="error" style="display: none;"></div>
-
-  <div id="result" class="result" style="display: none;">
-    <div class="status" id="status"></div>
-    <p><strong>Puntaje:</strong> <span id="score"></span></p>
-    <p><strong>Señales detectadas:</strong></p>
-    <ul id="signals"></ul>
-  </div>
-
-  <button id="analyzeBtn">Analizar página</button>
-
-  <script src="popup.js"></script>
-
-</body>
-</html>
+});

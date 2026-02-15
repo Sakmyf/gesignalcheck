@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
 # ---------------------------------------
-# OpenAI opcional
+# OpenAI opcional (solo PRO/ENTERPRISE)
 # ---------------------------------------
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = None
@@ -20,17 +20,37 @@ if OPENAI_API_KEY:
 # ---------------------------------------
 # API Keys por plan
 # ---------------------------------------
-BASIC_KEYS = [k.strip() for k in os.getenv("API_KEYS_BASIC", "").split(",") if k.strip()]
-PRO_KEYS = [k.strip() for k in os.getenv("API_KEYS_PRO", "").split(",") if k.strip()]
-ENTERPRISE_KEYS = [k.strip() for k in os.getenv("API_KEYS_ENTERPRISE", "").split(",") if k.strip()]
+
+def parse_keys(env_name: str):
+    raw = os.getenv(env_name, "")
+    if not raw:
+        return []
+    return [k.strip() for k in raw.split(",") if k.strip()]
+
+
+BASIC_KEYS = parse_keys("API_KEYS_BASIC")
+PRO_KEYS = parse_keys("API_KEYS_PRO")
+ENTERPRISE_KEYS = parse_keys("API_KEYS_ENTERPRISE")
+
+# Fallback por si alguien usa CLIENT_API_KEY
+CLIENT_SINGLE_KEY = os.getenv("CLIENT_API_KEY")
+if CLIENT_SINGLE_KEY:
+    BASIC_KEYS.append(CLIENT_SINGLE_KEY.strip())
+
 
 def get_plan(api_key: str):
+    if not api_key:
+        return None
+
+    api_key = api_key.strip()
+
     if api_key in ENTERPRISE_KEYS:
         return "enterprise"
-    elif api_key in PRO_KEYS:
+    if api_key in PRO_KEYS:
         return "pro"
-    elif api_key in BASIC_KEYS:
+    if api_key in BASIC_KEYS:
         return "basic"
+
     return None
 
 # ---------------------------------------
@@ -104,11 +124,13 @@ def rhetorical_score(text: str):
     score = 0.0
     signals = []
 
-    if re.search(r"\bURGENTE\b|\bESCÁNDALO\b|\bIMPACTANTE\b", text.upper()):
+    upper = text.upper()
+
+    if re.search(r"\bURGENTE\b|\bESCÁNDALO\b|\bIMPACTANTE\b", upper):
         score += 0.3
         signals.append("Lenguaje alarmista")
 
-    if re.search(r"\bTRAICIÓN\b|\bCOLAPSO\b|\bCAOS\b", text.upper()):
+    if re.search(r"\bTRAICIÓN\b|\bCOLAPSO\b|\bCAOS\b", upper):
         score += 0.2
         signals.append("Carga emocional fuerte")
 
@@ -125,9 +147,6 @@ def ai_enterprise_analysis(text: str):
 
     if not client:
         return {
-            "emotional_intensity": 0.0,
-            "alarmism": 0.0,
-            "polarization": 0.0,
             "manipulative_intent": 0.0,
             "signals": [],
             "status": "IA desactivada"
@@ -135,9 +154,6 @@ def ai_enterprise_analysis(text: str):
 
     if not text or len(text.strip()) < 300:
         return {
-            "emotional_intensity": 0.0,
-            "alarmism": 0.0,
-            "polarization": 0.0,
             "manipulative_intent": 0.0,
             "signals": [],
             "status": "Texto insuficiente"
@@ -147,16 +163,11 @@ def ai_enterprise_analysis(text: str):
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             temperature=0.2,
-            max_tokens=300,
+            max_tokens=250,
             messages=[
                 {
                     "role": "system",
-                    "content": """
-Analiza patrones discursivos.
-NO evalúes ideología ni religión.
-Evalúa intención manipulativa y estructura retórica.
-Devuelve SOLO JSON válido.
-"""
+                    "content": "Analiza manipulación discursiva. Devuelve SOLO JSON válido."
                 },
                 {
                     "role": "user",
@@ -164,9 +175,6 @@ Devuelve SOLO JSON válido.
 Devuelve únicamente:
 
 {{
-  "emotional_intensity": 0.0,
-  "alarmism": 0.0,
-  "polarization": 0.0,
   "manipulative_intent": 0.0,
   "signals": ["string"]
 }}
@@ -180,87 +188,79 @@ Texto:
 
         content = response.choices[0].message.content
         parsed = json.loads(content)
-
         parsed["status"] = "IA activa"
+
         return parsed
 
     except Exception as e:
         print("AI error:", e)
         return {
-            "emotional_intensity": 0.0,
-            "alarmism": 0.0,
-            "polarization": 0.0,
             "manipulative_intent": 0.0,
             "signals": [],
             "status": "Error IA"
         }
 
 # ---------------------------------------
-# ROOT
-# ---------------------------------------
-@app.get("/")
-def root():
-    return {"status": "GESignalCheck B2B API v3 online"}
-
-# ---------------------------------------
 # ENDPOINT PRINCIPAL
 # ---------------------------------------
+from fastapi import Request, HTTPException
+
 @app.post("/v3/verify")
 async def verify(request: Request, data: VerifyRequest):
 
-    api_key = request.headers.get("x-api-key")
-    if not api_key:
+    # 🔐 Leer API key (case insensitive)
+    incoming_key = request.headers.get("x-api-key") or request.headers.get("X-API-Key")
+
+    if not incoming_key:
         raise HTTPException(status_code=401, detail="API key requerida")
 
-    plan = get_plan(api_key)
+    incoming_key = incoming_key.strip()
+
+    plan = get_plan(incoming_key)
+
     if not plan:
         raise HTTPException(status_code=403, detail="API key inválida")
+
+    if not data.text or len(data.text.strip()) < 30:
+        raise HTTPException(status_code=400, detail="Texto insuficiente para análisis")
 
     # 1️⃣ Score estructural
     s_score, s_signals = structural_score(data.url, data.text)
 
-    # 2️⃣ Heurístico retórico
+    # 2️⃣ Score retórico heurístico
     r_score_h, r_signals_h = rhetorical_score(data.text)
 
-    # 3️⃣ IA enterprise
-    ai_data = ai_enterprise_analysis(data.text)
+    # 3️⃣ Score retórico IA (solo si plan lo permite)
+    r_score_ai = 0.0
+    r_signals_ai = []
+    ai_status = "IA no incluida en plan"
 
-    # 4️⃣ Score retórico enterprise ponderado
-    final_rhetorical = (
-        ai_data["manipulative_intent"] * 0.40 +
-        ai_data["alarmism"] * 0.20 +
-        ai_data["polarization"] * 0.20 +
-        ai_data["emotional_intensity"] * 0.20
-    )
+    if plan in ["pro", "enterprise"]:
+        ai_result = ai_enterprise_analysis(data.text)
+        r_score_ai = ai_result.get("manipulative_intent", 0.0)
+        r_signals_ai = ai_result.get("signals", [])
+        ai_status = ai_result.get("status", "Desconocido")
 
-    # 5️⃣ Índice final de riesgo
-    risk_index = (1 - s_score) * 0.5 + final_rhetorical * 0.5
+    # 4️⃣ Combinación retórica
+    final_rhetorical = (r_score_h * 0.6) + (r_score_ai * 0.4)
 
-    # -----------------------------------
-    # RESPUESTAS SEGÚN PLAN
-    # -----------------------------------
+    # 5️⃣ Índice final
+    risk_index = (final_rhetorical * 0.8) + ((1 - s_score) * 0.2)
 
-    if plan == "basic":
-        return {
-            "risk_index": round(risk_index, 2)
+    # Anti falsos positivos
+    if final_rhetorical < 0.15:
+        risk_index = min(risk_index, 0.45)
+
+    risk_index = max(0.0, min(risk_index, 1.0))
+
+    return {
+        "plan": plan,
+        "structural_trust_score": round(s_score, 2),
+        "rhetorical_manipulation_score": round(final_rhetorical, 2),
+        "risk_index": round(risk_index, 2),
+        "details": {
+            "structural_signals": s_signals,
+            "rhetorical_signals": list(set(r_signals_h + r_signals_ai)),
+            "ai_status": ai_status
         }
-
-    if plan == "pro":
-        return {
-            "structural_score": round(s_score, 2),
-            "rhetorical_score": round(final_rhetorical, 2),
-            "risk_index": round(risk_index, 2)
-        }
-
-    if plan == "enterprise":
-        return {
-            "structural_trust_score": round(s_score, 2),
-            "emotional_intensity": ai_data["emotional_intensity"],
-            "alarmism": ai_data["alarmism"],
-            "polarization": ai_data["polarization"],
-            "manipulative_intent": ai_data["manipulative_intent"],
-            "risk_index": round(risk_index, 2),
-            "signals": list(set(s_signals + r_signals_h + ai_data["signals"])),
-            "engine_version": "B2B-v3",
-            "ai_status": ai_data["status"]
-        }
+    }

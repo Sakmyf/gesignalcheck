@@ -1,8 +1,26 @@
-console.log("✅ SignalCheck content_script cargado");
+function extractCleanText() {
+  if (!document.body) return "";
+
+  const clonedBody = document.body.cloneNode(true);
+  const elementsToRemove = clonedBody.querySelectorAll("script, style, noscript");
+  elementsToRemove.forEach(el => el.remove());
+
+  const text = clonedBody.innerText || "";
+  return text.replace(/\s+/g, " ").trim();
+}
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "getText") {
-    const text = document.body ? document.body.innerText : "";
-    sendResponse({ text: text.substring(0, 5000) });
+
+  if (request.action === "extractText") {
+
+    const cleanText = extractCleanText();
+
+    sendResponse({
+      text: cleanText.substring(0, 12000),
+      url: window.location.href,
+      title: document.title || ""
+    });
   }
+
+  return true;
 });

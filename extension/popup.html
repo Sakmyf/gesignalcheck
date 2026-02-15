@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <title>SignalCheck</title>
@@ -10,21 +10,37 @@
   <div class="signal-popup">
 
     <div class="signal-title">SignalCheck</div>
+    <div class="signal-subtitle">
+      Análisis contextual de información
+    </div>
 
-    <div id="labelBadge" class="signal-label">Esperando análisis...</div>
+    <div id="labelBadge" class="signal-label">
+      Esperando análisis...
+    </div>
 
     <div class="confidence-bar-container">
-      <div class="confidence-bar" id="confidenceBar"></div>
+      <div id="confidenceBar" class="confidence-bar"></div>
     </div>
 
     <div class="score-text">
       Puntaje: <span id="scoreValue">0.00</span>
     </div>
 
-    <button id="analyzeBtn" class="signal-btn">Analizar página</button>
+    <div class="signals">
+      <strong>Señales detectadas:</strong>
+      <ul id="signalsList">
+        <li>Ninguna aún</li>
+      </ul>
+    </div>
+
+    <div id="error" class="error"></div>
+
+    <button id="analyzeBtn" class="signal-btn">
+      Analizar página
+    </button>
 
   </div>
 
-  <script src="popup.js"></script>
+  <script src="popup_v2.js"></script>
 </body>
 </html>
