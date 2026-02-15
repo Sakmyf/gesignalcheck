@@ -130,8 +130,7 @@ def root():
 @app.post("/v3/verify")
 async def verify(request: Request, data: VerifyRequest):
 
-    print(">>> VERSION EXTENSION-ID ACTIVA <<<")
-
+    # 🔐 Validación por ID de extensión
     extension_id = request.headers.get("x-extension-id")
 
     if not extension_id:
@@ -142,6 +141,7 @@ async def verify(request: Request, data: VerifyRequest):
     if extension_id not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=403, detail="Extensión no autorizada")
 
+    # 🔎 Análisis
     s_score, s_signals = structural_score(data.url, data.text)
     r_score, r_signals = rhetorical_score(data.text)
 
