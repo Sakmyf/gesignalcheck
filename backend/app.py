@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # ---------------------------------------
 # FastAPI Init
 # ---------------------------------------
-app = FastAPI(title="GE SignalCheck API v3 - Extension Mode")
+app = FastAPI(title="GE SignalCheck API v4 - Extension Mode")
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,38 +35,55 @@ class VerifyRequest(BaseModel):
     text: str = ""
 
 # ---------------------------------------
-# Score estructural
+# Score estructural V4
 # ---------------------------------------
 def structural_score(url: str, text: str):
-
-    score = 0.5
-    signals = []
 
     parsed = urlparse(url)
     domain = parsed.netloc.lower()
 
-    if parsed.scheme == "https":
-        score += 0.15
-        signals.append("HTTPS")
+    signals = []
+    domain_type = "unknown"
 
-    if domain.endswith(".gov.ar") or domain.endswith(".gob.ar"):
-        score += 0.25
-        signals.append("Dominio oficial")
+    INSTITUTIONAL = [".gov", ".gov.ar", ".gob.ar", ".edu", ".edu.ar"]
+    TRADITIONAL_MEDIA = ["reuters.com", "bbc.com", "lanacion.com.ar", "clarin.com"]
+    SOCIAL_MEDIA = ["facebook.com", "twitter.com", "x.com", "instagram.com", "tiktok.com"]
+    SHORTENERS = ["bit.ly", "tinyurl.com"]
 
-    if "vatican.va" in domain:
-        score += 0.25
-        signals.append("Organismo oficial")
+    # Base trust por defecto
+    trust = 0.45
 
-    if "iprofesional.com" in domain:
-        score += 0.05
+    if any(domain.endswith(tld) for tld in INSTITUTIONAL):
+        trust = 0.85
+        domain_type = "institutional"
+        signals.append("Dominio institucional")
+
+    elif any(media in domain for media in TRADITIONAL_MEDIA):
+        trust = 0.70
+        domain_type = "traditional_media"
         signals.append("Medio tradicional")
 
+    elif any(social in domain for social in SOCIAL_MEDIA):
+        trust = 0.35
+        domain_type = "social"
+        signals.append("Contenido en red social")
+
+    elif any(short in domain for short in SHORTENERS):
+        trust = 0.25
+        domain_type = "shortener"
+        signals.append("Dominio acortador")
+
+    if parsed.scheme == "https":
+        trust += 0.05
+        signals.append("HTTPS")
+
     if len(text.strip()) < 200:
-        score -= 0.10
+        trust -= 0.05
         signals.append("Contenido limitado")
 
-    score = max(0.0, min(score, 1.0))
-    return score, signals
+    trust = max(0.0, min(trust, 1.0))
+
+    return trust, signals, domain_type
 
 # ---------------------------------------
 # Score retórico
@@ -120,17 +137,23 @@ async def verify(request: Request, data: VerifyRequest):
         raise HTTPException(status_code=400, detail="Texto insuficiente")
 
     # 1️⃣ Score estructural
-    s_score, s_signals = structural_score(data.url, data.text)
+    trust_score, s_signals, domain_type = structural_score(data.url, data.text)
 
     # 2️⃣ Score retórico
     r_score, r_signals = rhetorical_score(data.text)
 
     # 3️⃣ Índice final
-    risk_index = (r_score * 0.7) + ((1 - s_score) * 0.3)
+    risk_index = (r_score * 0.7) + ((1 - trust_score) * 0.3)
+
+    # Piso mínimo para redes sociales
+    if domain_type == "social":
+        risk_index = max(risk_index, 0.30)
+
     risk_index = max(0.0, min(risk_index, 1.0))
 
     return {
-        "structural_trust_score": round(s_score, 2),
+        "structural_trust_score": round(trust_score, 2),
+        "source_type": domain_type,
         "rhetorical_manipulation_score": round(r_score, 2),
         "risk_index": round(risk_index, 2),
         "details": {
