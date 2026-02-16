@@ -9,111 +9,163 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const API_URL = "https://ge-signal-check-production.up.railway.app/v3/verify";
 
+  // ======================================================
+  // MAIN CLICK HANDLER
+  // ======================================================
+
   analyzeBtn.addEventListener("click", async () => {
 
     resetUI();
-    console.log("🔎 Botón analizar clickeado");
+    console.log("🔎 Analizando página...");
 
     try {
 
-      // 1️⃣ Obtener pestaña activa
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await getActiveTab();
+      const extracted = await getPageText(tab);
 
-      if (!tabs || tabs.length === 0) {
-        showError("No se encontró pestaña activa.");
-        return;
-      }
-
-      const tab = tabs[0];
-
-      if (!tab.id) {
-        showError("ID de pestaña inválido.");
-        return;
-      }
-
-      console.log("📄 Pestaña detectada:", tab.url);
-
-      // 2️⃣ Enviar mensaje al content_script
-      console.log("📨 Enviando mensaje al content script...");
-      let response;
-
-      try {
-        response = await chrome.tabs.sendMessage(tab.id, { action: "extractText" });
-      } catch (err) {
-        console.error("❌ Content script no responde:", err);
-        showError("No se pudo conectar con la página. Recargá la pestaña.");
-        return;
-      }
-
-      console.log("📥 Respuesta content script:", response);
-
-      if (!response || !response.text || response.text.length < 50) {
+      if (!extracted || !extracted.text || extracted.text.length < 50) {
         showError("No se pudo extraer texto significativo.");
         return;
       }
 
-      // 3️⃣ Obtener ID de extensión
-      const extensionId = chrome.runtime.id;
+      const result = await callBackend(extracted);
 
-      if (!extensionId) {
-        showError("No se pudo obtener ID de extensión.");
+      if (!result) {
+        showError("Respuesta inválida del servidor.");
         return;
       }
 
-      console.log("🆔 Extension ID:", extensionId);
-      console.log("🚀 Iniciando fetch al backend...");
+      updateUI(result);
 
-      // 4️⃣ Llamada al backend
-      const apiResponse = await fetch(API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-extension-id": extensionId
-        },
-        body: JSON.stringify({
-          url: response.url,
-          text: response.text
-        })
-      });
-
-      console.log("🌐 Respuesta HTTP:", apiResponse.status);
-
-      if (!apiResponse.ok) {
-        const errorText = await apiResponse.text();
-        console.error("❌ HTTP ERROR:", apiResponse.status, errorText);
-        showError("Error del servidor (" + apiResponse.status + ")");
-        return;
-      }
-
-      const data = await apiResponse.json();
-      console.log("✅ Respuesta backend:", data);
-
-      updateUI(data);
-
-    } catch (error) {
-      console.error("🔥 ERROR GENERAL:", error);
-      showError("Error real: " + (error?.message || "Desconocido"));
+    } catch (err) {
+      console.error("🔥 ERROR GENERAL:", err);
+      showError(err?.message || "Error inesperado");
     }
 
   });
 
-  // ----------------------------------------
-  // UI FUNCTIONS
-  // ----------------------------------------
+// =====================================================
+// TAB
+// =====================================================
+
+async function getActiveTab() {
+
+  const tabs = await chrome.tabs.query({
+    active: true,
+    currentWindow: true
+  });
+
+  if (!tabs || tabs.length === 0) {
+    throw new Error("No se encontró pestaña activa.");
+  }
+
+  const tab = tabs[0];
+
+  if (!tab.id) {
+    throw new Error("ID de pestaña inválido.");
+  }
+
+  if (!tab.url) {
+    throw new Error("No se pudo obtener la URL.");
+  }
+
+  // 🚫 Bloquear páginas donde no se puede inyectar
+  const blockedProtocols = [
+    "chrome://",
+    "chrome-extension://",
+    "edge://",
+    "about:",
+    "file://"
+  ];
+
+  if (blockedProtocols.some(protocol => tab.url.startsWith(protocol))) {
+    throw new Error("No se puede analizar esta página.");
+  }
+
+  return tab;
+}
+
+  // ======================================================
+  // TEXT EXTRACTION
+  // ======================================================
+
+  async function getPageText(tab) {
+
+    try {
+      return await chrome.tabs.sendMessage(tab.id, { action: "extractText" });
+    } catch (err) {
+
+      console.log("ℹ Reiniciando conexión con la página...");
+
+      // Inyección manual (MV3 fallback)
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ["content_script.js"]
+      });
+
+      // pequeño delay para asegurar registro del listener
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      return await chrome.tabs.sendMessage(tab.id, { action: "extractText" });
+    }
+  }
+
+  // ======================================================
+  // BACKEND CALL
+  // ======================================================
+
+  async function callBackend(extracted) {
+
+    const extensionId = chrome.runtime.id;
+
+    if (!extensionId) {
+      throw new Error("No se pudo obtener ID de extensión.");
+    }
+
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-extension-id": extensionId
+      },
+      body: JSON.stringify({
+        url: extracted.url,
+        text: extracted.text
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ HTTP ERROR:", response.status, errorText);
+      throw new Error("Error del servidor (" + response.status + ")");
+    }
+
+    return await response.json();
+  }
+
+  // ======================================================
+  // UI
+  // ======================================================
 
   function resetUI() {
+
     errorDiv.style.display = "none";
+    errorDiv.textContent = "";
+
     labelBadge.textContent = "Analizando...";
     labelBadge.className = "signal-label";
+
     scoreValue.textContent = "0.00";
+
     confidenceBar.style.width = "0%";
     confidenceBar.className = "confidence-bar";
+
     signalsList.innerHTML = "<li>Procesando...</li>";
   }
 
   function updateUI(data) {
 
-    if (!data || typeof data.risk_index !== "number") {
+    if (typeof data.risk_index !== "number") {
       showError("Respuesta inválida del servidor.");
       return;
     }
@@ -122,12 +174,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
     scoreValue.textContent = risk.toFixed(2);
     confidenceBar.style.width = (risk * 100) + "%";
+
+    labelBadge.className = "signal-label";
+    confidenceBar.className = "confidence-bar";
+
     signalsList.innerHTML = "";
 
-    const signals = data?.details?.rhetorical_signals || [];
+    // Recolectar señales
+    const allSignals = [
+      ...(data?.details?.structural_signals || []),
+      ...(data?.details?.rhetorical_signals || []),
+      ...(data?.details?.narrative_signals || []),
+      ...(data?.details?.source_signals || [])
+    ];
 
-    if (signals.length > 0) {
-      signals.forEach(signal => {
+    if (allSignals.length > 0) {
+      allSignals.forEach(signal => {
         const li = document.createElement("li");
         li.textContent = signal;
         signalsList.appendChild(li);
@@ -136,14 +198,32 @@ document.addEventListener("DOMContentLoaded", () => {
       signalsList.innerHTML = "<li>No se detectaron señales relevantes</li>";
     }
 
+    // Advertencia contextual prioritaria
+    if (data.context_warning) {
+
+      labelBadge.textContent = "Advertencia Contextual";
+      labelBadge.classList.add("risk-medium");
+      confidenceBar.classList.add("bar-medium");
+
+      const warningLi = document.createElement("li");
+      warningLi.textContent = "⚠ " + data.context_warning;
+      warningLi.style.fontWeight = "bold";
+
+      signalsList.prepend(warningLi);
+      return;
+    }
+
+    // Escala normal
     if (risk < 0.35) {
       labelBadge.textContent = "Riesgo Bajo";
       labelBadge.classList.add("risk-low");
       confidenceBar.classList.add("bar-low");
+
     } else if (risk < 0.65) {
       labelBadge.textContent = "Riesgo Medio";
       labelBadge.classList.add("risk-medium");
       confidenceBar.classList.add("bar-medium");
+
     } else {
       labelBadge.textContent = "Riesgo Alto";
       labelBadge.classList.add("risk-high");
@@ -152,10 +232,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function showError(message) {
+
     errorDiv.textContent = message;
     errorDiv.style.display = "block";
+
     labelBadge.textContent = "Error";
     labelBadge.className = "signal-label";
+
+    confidenceBar.style.width = "0%";
+    confidenceBar.className = "confidence-bar";
+
+    signalsList.innerHTML = "";
   }
 
 });
