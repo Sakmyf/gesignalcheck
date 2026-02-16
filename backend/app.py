@@ -1,6 +1,6 @@
-import os
+print("VERSION EXTENSION-ID ACTIVA")
+
 import re
-import json
 from urllib.parse import urlparse
 
 from fastapi import FastAPI, Request, HTTPException
@@ -8,55 +8,9 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
 # ---------------------------------------
-# OpenAI opcional (solo PRO/ENTERPRISE)
-# ---------------------------------------
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-client = None
-
-if OPENAI_API_KEY:
-    from openai import OpenAI
-    client = OpenAI(api_key=OPENAI_API_KEY)
-
-# ---------------------------------------
-# API Keys por plan
-# ---------------------------------------
-
-def parse_keys(env_name: str):
-    raw = os.getenv(env_name, "")
-    if not raw:
-        return []
-    return [k.strip() for k in raw.split(",") if k.strip()]
-
-
-BASIC_KEYS = parse_keys("API_KEYS_BASIC")
-PRO_KEYS = parse_keys("API_KEYS_PRO")
-ENTERPRISE_KEYS = parse_keys("API_KEYS_ENTERPRISE")
-
-# Fallback por si alguien usa CLIENT_API_KEY
-CLIENT_SINGLE_KEY = os.getenv("CLIENT_API_KEY")
-if CLIENT_SINGLE_KEY:
-    BASIC_KEYS.append(CLIENT_SINGLE_KEY.strip())
-
-
-def get_plan(api_key: str):
-    if not api_key:
-        return None
-
-    api_key = api_key.strip()
-
-    if api_key in ENTERPRISE_KEYS:
-        return "enterprise"
-    if api_key in PRO_KEYS:
-        return "pro"
-    if api_key in BASIC_KEYS:
-        return "basic"
-
-    return None
-
-# ---------------------------------------
 # FastAPI Init
 # ---------------------------------------
-app = FastAPI(title="GESignalCheck B2B API v3")
+app = FastAPI(title="GE SignalCheck API v3 - Extension Mode")
 
 app.add_middleware(
     CORSMiddleware,
@@ -67,27 +21,21 @@ app.add_middleware(
 )
 
 # ---------------------------------------
-# Modelo entrada
+# EXTENSIONES AUTORIZADAS
+# ---------------------------------------
+ALLOWED_EXTENSIONS = [
+    "fijnjbaacmpnhaaconoafbmnholbmaig"
+]
+
+# ---------------------------------------
+# Modelo de entrada
 # ---------------------------------------
 class VerifyRequest(BaseModel):
     url: str
     text: str = ""
 
 # ---------------------------------------
-# Listas estructurales
-# ---------------------------------------
-TRUSTED_TLDS = [".gov", ".gov.ar", ".gob.ar", ".edu", ".edu.ar", ".org"]
-
-TRADITIONAL_MEDIA = [
-    "iprofesional.com",
-    "lanacion.com.ar",
-    "clarin.com",
-    "reuters.com",
-    "bbc.com"
-]
-
-# ---------------------------------------
-# SCORE ESTRUCTURAL
+# Score estructural
 # ---------------------------------------
 def structural_score(url: str, text: str):
 
@@ -98,15 +46,19 @@ def structural_score(url: str, text: str):
     domain = parsed.netloc.lower()
 
     if parsed.scheme == "https":
-        score += 0.10
+        score += 0.15
         signals.append("HTTPS")
 
-    if any(domain.endswith(tld) for tld in TRUSTED_TLDS):
+    if domain.endswith(".gov.ar") or domain.endswith(".gob.ar"):
         score += 0.25
-        signals.append("Dominio institucional")
+        signals.append("Dominio oficial")
 
-    if any(media in domain for media in TRADITIONAL_MEDIA):
-        score += 0.10
+    if "vatican.va" in domain:
+        score += 0.25
+        signals.append("Organismo oficial")
+
+    if "iprofesional.com" in domain:
+        score += 0.05
         signals.append("Medio tradicional")
 
     if len(text.strip()) < 200:
@@ -117,7 +69,7 @@ def structural_score(url: str, text: str):
     return score, signals
 
 # ---------------------------------------
-# SCORE RETÓRICO HEURÍSTICO
+# Score retórico
 # ---------------------------------------
 def rhetorical_score(text: str):
 
@@ -130,7 +82,7 @@ def rhetorical_score(text: str):
         score += 0.3
         signals.append("Lenguaje alarmista")
 
-    if re.search(r"\bTRAICIÓN\b|\bCOLAPSO\b|\bCAOS\b", upper):
+    if re.search(r"\bCAOS\b|\bCOLAPSO\b|\bTRAICIÓN\b", upper):
         score += 0.2
         signals.append("Carga emocional fuerte")
 
@@ -141,126 +93,48 @@ def rhetorical_score(text: str):
     return min(score, 1.0), signals
 
 # ---------------------------------------
-# IA ENTERPRISE
+# Root
 # ---------------------------------------
-def ai_enterprise_analysis(text: str):
-
-    if not client:
-        return {
-            "manipulative_intent": 0.0,
-            "signals": [],
-            "status": "IA desactivada"
-        }
-
-    if not text or len(text.strip()) < 300:
-        return {
-            "manipulative_intent": 0.0,
-            "signals": [],
-            "status": "Texto insuficiente"
-        }
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            temperature=0.2,
-            max_tokens=250,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Analiza manipulación discursiva. Devuelve SOLO JSON válido."
-                },
-                {
-                    "role": "user",
-                    "content": f"""
-Devuelve únicamente:
-
-{{
-  "manipulative_intent": 0.0,
-  "signals": ["string"]
-}}
-
-Texto:
-{text[:3000]}
-"""
-                }
-            ]
-        )
-
-        content = response.choices[0].message.content
-        parsed = json.loads(content)
-        parsed["status"] = "IA activa"
-
-        return parsed
-
-    except Exception as e:
-        print("AI error:", e)
-        return {
-            "manipulative_intent": 0.0,
-            "signals": [],
-            "status": "Error IA"
-        }
+@app.get("/")
+def root():
+    return {"status": "GE SignalCheck API online"}
 
 # ---------------------------------------
-# ENDPOINT PRINCIPAL
+# Endpoint principal
 # ---------------------------------------
-from fastapi import Request, HTTPException
-
 @app.post("/v3/verify")
 async def verify(request: Request, data: VerifyRequest):
 
-    # 🔐 Leer API key (case insensitive)
-    incoming_key = request.headers.get("x-api-key") or request.headers.get("X-API-Key")
+    # 🔐 Validación por ID de extensión
+    extension_id = request.headers.get("x-extension-id")
 
-    if not incoming_key:
-        raise HTTPException(status_code=401, detail="API key requerida")
+    if not extension_id:
+        raise HTTPException(status_code=401, detail="Extensión no identificada")
 
-    incoming_key = incoming_key.strip()
+    extension_id = extension_id.strip()
 
-    plan = get_plan(incoming_key)
-
-    if not plan:
-        raise HTTPException(status_code=403, detail="API key inválida")
+    if extension_id not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=403, detail="Extensión no autorizada")
 
     if not data.text or len(data.text.strip()) < 30:
-        raise HTTPException(status_code=400, detail="Texto insuficiente para análisis")
+        raise HTTPException(status_code=400, detail="Texto insuficiente")
 
     # 1️⃣ Score estructural
     s_score, s_signals = structural_score(data.url, data.text)
 
-    # 2️⃣ Score retórico heurístico
-    r_score_h, r_signals_h = rhetorical_score(data.text)
+    # 2️⃣ Score retórico
+    r_score, r_signals = rhetorical_score(data.text)
 
-    # 3️⃣ Score retórico IA (solo si plan lo permite)
-    r_score_ai = 0.0
-    r_signals_ai = []
-    ai_status = "IA no incluida en plan"
-
-    if plan in ["pro", "enterprise"]:
-        ai_result = ai_enterprise_analysis(data.text)
-        r_score_ai = ai_result.get("manipulative_intent", 0.0)
-        r_signals_ai = ai_result.get("signals", [])
-        ai_status = ai_result.get("status", "Desconocido")
-
-    # 4️⃣ Combinación retórica
-    final_rhetorical = (r_score_h * 0.6) + (r_score_ai * 0.4)
-
-    # 5️⃣ Índice final
-    risk_index = (final_rhetorical * 0.8) + ((1 - s_score) * 0.2)
-
-    # Anti falsos positivos
-    if final_rhetorical < 0.15:
-        risk_index = min(risk_index, 0.45)
-
+    # 3️⃣ Índice final
+    risk_index = (r_score * 0.7) + ((1 - s_score) * 0.3)
     risk_index = max(0.0, min(risk_index, 1.0))
 
     return {
-        "plan": plan,
         "structural_trust_score": round(s_score, 2),
-        "rhetorical_manipulation_score": round(final_rhetorical, 2),
+        "rhetorical_manipulation_score": round(r_score, 2),
         "risk_index": round(risk_index, 2),
         "details": {
             "structural_signals": s_signals,
-            "rhetorical_signals": list(set(r_signals_h + r_signals_ai)),
-            "ai_status": ai_status
+            "rhetorical_signals": r_signals
         }
     }

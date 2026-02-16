@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
   analyzeBtn.addEventListener("click", async () => {
 
     resetUI();
+    console.log("🔎 Botón analizar clickeado");
 
     try {
 
@@ -30,21 +31,37 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // 2️⃣ Extraer texto desde content_script
-      const response = await chrome.tabs.sendMessage(tab.id, { action: "extractText" });
+      console.log("📄 Pestaña detectada:", tab.url);
+
+      // 2️⃣ Enviar mensaje al content_script
+      console.log("📨 Enviando mensaje al content script...");
+      let response;
+
+      try {
+        response = await chrome.tabs.sendMessage(tab.id, { action: "extractText" });
+      } catch (err) {
+        console.error("❌ Content script no responde:", err);
+        showError("No se pudo conectar con la página. Recargá la pestaña.");
+        return;
+      }
+
+      console.log("📥 Respuesta content script:", response);
 
       if (!response || !response.text || response.text.length < 50) {
         showError("No se pudo extraer texto significativo.");
         return;
       }
 
-      // 3️⃣ Obtener ID real de la extensión (seguridad)
+      // 3️⃣ Obtener ID de extensión
       const extensionId = chrome.runtime.id;
 
       if (!extensionId) {
         showError("No se pudo obtener ID de extensión.");
         return;
       }
+
+      console.log("🆔 Extension ID:", extensionId);
+      console.log("🚀 Iniciando fetch al backend...");
 
       // 4️⃣ Llamada al backend
       const apiResponse = await fetch(API_URL, {
@@ -59,19 +76,23 @@ document.addEventListener("DOMContentLoaded", () => {
         })
       });
 
+      console.log("🌐 Respuesta HTTP:", apiResponse.status);
+
       if (!apiResponse.ok) {
         const errorText = await apiResponse.text();
-        console.error("HTTP ERROR:", apiResponse.status, errorText);
+        console.error("❌ HTTP ERROR:", apiResponse.status, errorText);
         showError("Error del servidor (" + apiResponse.status + ")");
         return;
       }
 
       const data = await apiResponse.json();
+      console.log("✅ Respuesta backend:", data);
+
       updateUI(data);
 
     } catch (error) {
-      console.error("Error general:", error);
-      showError("Error en la comunicación con el servidor.");
+      console.error("🔥 ERROR GENERAL:", error);
+      showError("Error real: " + (error?.message || "Desconocido"));
     }
 
   });
@@ -101,7 +122,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     scoreValue.textContent = risk.toFixed(2);
     confidenceBar.style.width = (risk * 100) + "%";
-
     signalsList.innerHTML = "";
 
     const signals = data?.details?.rhetorical_signals || [];
