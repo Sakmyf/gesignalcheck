@@ -52,7 +52,8 @@ if (!window.__SignalCheckInjected__) {
   // ------------------------------------------------------
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
-    if (!request || request.action !== "extractText") {
+    // ✅ Unificado con service_worker.js
+    if (!request || request.action !== "getText") {
       return;
     }
 

@@ -1,18 +1,48 @@
-print("VERSION EXTENSION-ID ACTIVA")
+from database import engine, Base, SessionLocal
+import models
+
+print("VERSION EXTENSION-ID ACTIVA - ESCALABLE METRICS")
 
 import re
+import uuid
+import os
+import requests
+from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, Request, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+from sqlalchemy import func
+
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    Image
+)
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import TableStyle
 
 
 # ==========================================================
-# FASTAPI INIT
+# CONFIG
 # ==========================================================
 
-app = FastAPI(title="GE SignalCheck API v7 - Production Stable")
+ENGINE_VERSION = "v8.0"
+LOGO_URL = "https://gesignalcheck.com/assets/logo.png"
+LOGO_WIDTH_INCH = 1.2
+
+ALLOWED_EXTENSIONS = [
+    "fijnjbaacmpnhaaconoafbmnholbmaig"
+]
+
+app = FastAPI(title="GE SignalCheck API v8 - Scalable")
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,96 +52,43 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# ==========================================================
-# EXTENSIONES AUTORIZADAS
-# ==========================================================
-
-ALLOWED_EXTENSIONS = [
-    "fijnjbaacmpnhaaconoafbmnholbmaig"
-]
+Base.metadata.create_all(bind=engine)
 
 
 # ==========================================================
-# MODELO DE ENTRADA
+# MODEL INPUT
 # ==========================================================
 
 class VerifyRequest(BaseModel):
     url: str
     text: str
 
+class EventRequest(BaseModel):
+    event_name: str
+    user_type: str = "free"
+
 
 # ==========================================================
-# SCORE ESTRUCTURAL
+# SCORE FUNCTIONS
 # ==========================================================
+
+def map_score_to_level(score: float) -> str:
+    if score <= 0.30:
+        return "bajo"
+    elif score <= 0.60:
+        return "medio"
+    return "alto"
+
 
 def structural_score(url: str, text: str):
-
     parsed = urlparse(url)
-    domain = parsed.netloc.lower()
-
-    if domain.startswith("www."):
-        domain = domain[4:]
-
-    signals = []
-    domain_type = "unknown"
-
-    INSTITUTIONAL = [".gov", ".gov.ar", ".gob.ar", ".edu", ".edu.ar"]
-
-    TRADITIONAL_MEDIA = {
-        "reuters.com",
-        "bbc.com",
-        "lanacion.com.ar",
-        "clarin.com",
-        "chequeado.com",
-        "iprofesional.com"
-    }
-
-    SATIRICAL_SITES = {
-        "elmundo.today",
-        "theonion.com",
-        "clickhole.com"
-    }
-
-    SOCIAL_MEDIA = {
-        "facebook.com",
-        "twitter.com",
-        "x.com",
-        "instagram.com",
-        "tiktok.com"
-    }
-
-    SHORTENERS = {
-        "bit.ly",
-        "tinyurl.com"
-    }
-
+    domain = parsed.netloc.lower().replace("www.", "")
     trust = 0.45
+    signals = []
 
-    if any(domain.endswith(tld) for tld in INSTITUTIONAL):
+    if domain.endswith((".gov", ".edu", ".gob.ar", ".gov.ar")):
         trust = 0.85
-        domain_type = "institutional"
         signals.append("Dominio institucional")
-
-    elif domain in TRADITIONAL_MEDIA:
-        trust = 0.70
-        domain_type = "traditional_media"
-        signals.append("Medio tradicional")
-
-    elif domain in SATIRICAL_SITES:
-        trust = 0.50
-        domain_type = "satire"
-        signals.append("Sitio satírico declarado")
-
-    elif domain in SOCIAL_MEDIA:
-        trust = 0.40
-        domain_type = "social"
-        signals.append("Contenido en red social")
-
-    elif domain in SHORTENERS:
-        trust = 0.25
-        domain_type = "shortener"
-        signals.append("Dominio acortador")
 
     if parsed.scheme == "https":
         trust += 0.05
@@ -121,124 +98,198 @@ def structural_score(url: str, text: str):
         trust -= 0.05
         signals.append("Contenido limitado")
 
-    trust = max(0.0, min(trust, 1.0))
-
-    return trust, signals, domain_type
+    return max(0, min(trust, 1)), signals
 
 
-# ==========================================================
-# SCORE RETÓRICO
-# ==========================================================
-
-def rhetorical_score(text: str, domain_type: str):
-
-    score = 0.0
+def rhetorical_score(text: str):
+    score = 0
     signals = []
-
     upper = text.upper()
-    lower = text.lower()
 
-    # ---------------------------------------
-    # Alarmismo explícito
-    # ---------------------------------------
     if re.search(r"\bURGENTE\b|\bESCÁNDALO\b|\bIMPACTANTE\b", upper):
         score += 0.25
         signals.append("Lenguaje alarmista")
 
-    # ---------------------------------------
-    # Carga emocional fuerte
-    # ---------------------------------------
-    if re.search(r"\bCAOS\b|\bCOLAPSO\b|\bTRAICIÓN\b", upper):
+    if re.search(r"\bCAOS\b|\bCOLAPSO\b", upper):
         score += 0.20
         signals.append("Carga emocional fuerte")
 
-    # ---------------------------------------
-    # MAYÚSCULAS INTELIGENTES (por bloques narrativos)
-    # ---------------------------------------
+    return min(score, 1), signals
 
-    # No penalizar medios formales
-    if domain_type not in ["institutional", "traditional_media"]:
 
-        # Solo analizar si hay suficiente texto
-        if len(text) > 400:
-
-            # Detectar bloques largos narrativos
-            paragraphs = re.findall(r"[A-Za-zÁÉÍÓÚÑáéíóúñ\s]{80,}", text)
-
-            uppercase_blocks = 0
-
-            for p in paragraphs:
-                letters = re.findall(r"[A-Za-zÁÉÍÓÚÑáéíóúñ]", p)
-                upper_letters = re.findall(r"[A-ZÁÉÍÓÚÑ]", p)
-
-                if not letters:
-                    continue
-
-                upper_ratio = len(upper_letters) / len(letters)
-
-                # Solo contar si el bloque realmente grita
-                if upper_ratio > 0.40:
-                    uppercase_blocks += 1
-
-            if uppercase_blocks >= 1:
-                score += 0.12
-                signals.append("Uso enfático de mayúsculas en contenido narrativo")
-
-    return min(score, 1.0), signals
-
-# ==========================================================
-# SCORE NARRATIVO
-# ==========================================================
-
-def narrative_score(text: str, domain_type: str):
-
-    score = 0.0
+def narrative_score(text: str):
+    score = 0
     signals = []
     lower = text.lower()
 
-    if domain_type == "satire":
-        return 0.0, []
-
-    if re.search(
-        r"\bescena imaginada\b|\brecreación\b|\bsegún trascendió\b|\bdentro de este relato\b",
-        lower
-    ):
+    if "según trascendió" in lower:
         score += 0.30
         signals.append("Narrativa no verificable")
 
-    if re.search(
-        r"\bdejó paralizada\b|\bdejó en silencio\b|\bola imparable\b|\bel país entero\b",
-        lower
-    ):
-        score += 0.25
-        signals.append("Dramatización narrativa")
+    if "dijo" in lower and "http" not in lower:
+        score += 0.20
+        signals.append("Afirmaciones sin fuente visible")
 
-    if re.search(r"\bdijo\b|\bafirmó\b|\bdeclaró\b", lower):
-        if "http" not in lower and "www." not in lower:
-            score += 0.20
-            signals.append("Afirmaciones sin fuente visible")
+    return min(score, 1), signals
 
-    return min(score, 1.0), signals
-
-
-# ==========================================================
-# AUSENCIA DE FUENTE
-# ==========================================================
 
 def absence_of_source_score(text: str):
-
-    score = 0.0
+    score = 0
     signals = []
-    lower = text.lower()
 
-    has_link = bool(re.search(r"http[s]?://|www\.", lower))
-    has_reference = bool(re.search(r"\bsegún\b|\bde acuerdo con\b|\bfuente\b", lower))
-
-    if not has_link and not has_reference:
+    if "http" not in text.lower():
         score += 0.25
         signals.append("No se detectan referencias a fuentes")
 
-    return min(score, 1.0), signals
+    return min(score, 1), signals
+
+
+# ==========================================================
+# ANALYSIS CORE
+# ==========================================================
+
+def collect_analysis(url, text):
+    trust, s = structural_score(url, text)
+    r, rs = rhetorical_score(text)
+    n, ns = narrative_score(text)
+    a, asg = absence_of_source_score(text)
+
+    risk = (0.30*r)+(0.25*n)+(0.20*a)+(0.25*(1-trust))
+    risk = max(0, min(risk, 1))
+
+    return {
+        "trust": trust,
+        "r": r,
+        "n": n,
+        "a": a,
+        "risk": risk,
+        "signals": s + rs + ns + asg
+    }
+
+
+# ==========================================================
+# METRICS LOGGER
+# ==========================================================
+
+def log_daily_metrics(risk_value, premium=False):
+    db = SessionLocal()
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+
+    record = db.query(models.DailyMetrics).filter_by(date=today).first()
+
+    if not record:
+        record = models.DailyMetrics(
+            date=today,
+            total_verifications=1,
+            total_premium_reports=1 if premium else 0,
+            average_risk=risk_value
+        )
+        db.add(record)
+    else:
+        total = record.total_verifications + 1
+        record.average_risk = ((record.average_risk * record.total_verifications) + risk_value) / total
+        record.total_verifications = total
+        if premium:
+            record.total_premium_reports += 1
+
+    db.commit()
+    db.close()
+
+
+# ==========================================================
+# COUNTRY DETECTION (sin guardar IP)
+# ==========================================================
+
+def get_country_from_ip(ip: str) -> str:
+    if not ip or ip in ["127.0.0.1", "::1"]:
+        return "XX"
+    try:
+        response = requests.get(f"https://ipapi.co/{ip}/country_code/", timeout=2)
+        if response.status_code == 200:
+            country = response.text.strip().upper()
+            return country if len(country) == 2 else "XX"
+    except:
+        pass
+    return "XX"
+
+
+# ==========================================================
+# EVENT TRACKING
+# ==========================================================
+
+@app.post("/event")
+async def log_event(event: EventRequest, request: Request):
+    allowed_events = {
+        "landing_view", "click_install", "verify_call", 
+        "premium_request", "pdf_generated"
+    }
+    if event.event_name not in allowed_events:
+        raise HTTPException(status_code=400, detail="Evento no permitido")
+    
+    if event.user_type not in ["free", "premium"]:
+        event.user_type = "free"
+    
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    country = get_country_from_ip(client_ip)
+    
+    db = SessionLocal()
+    try:
+        new_event = models.AnonymousEvent(
+            event_name=event.event_name,
+            country=country,
+            user_type=event.user_type
+        )
+        db.add(new_event)
+        db.commit()
+        return {"status": "logged"}
+    finally:
+        db.close()
+
+
+# ==========================================================
+# PDF GENERATOR
+# ==========================================================
+
+def fetch_logo():
+    try:
+        r = requests.get(LOGO_URL, timeout=5)
+        path = "/tmp/logo.png"
+        with open(path, "wb") as f:
+            f.write(r.content)
+        return path
+    except:
+        return None
+
+
+def generate_pdf(data, url):
+    file_id = str(uuid.uuid4())
+    file_path = f"/tmp/report_{file_id}.pdf"
+
+    doc = SimpleDocTemplate(file_path, pagesize=A4)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    logo = fetch_logo()
+    if logo:
+        img = Image(logo)
+        img.drawWidth = LOGO_WIDTH_INCH * inch
+        img.drawHeight = LOGO_WIDTH_INCH * inch
+        img.hAlign = "CENTER"
+        elements.append(img)
+        elements.append(Spacer(1, 0.2 * inch))
+
+    elements.append(Paragraph("SignalCheck – Informe Estructural", styles["Heading1"]))
+    elements.append(Spacer(1, 0.3 * inch))
+    elements.append(Paragraph(f"Fecha: {datetime.utcnow()}", styles["Normal"]))
+    elements.append(Paragraph(f"Motor: {ENGINE_VERSION}", styles["Normal"]))
+    elements.append(Spacer(1, 0.2 * inch))
+    elements.append(Paragraph(f"URL: {url}", styles["Normal"]))
+    elements.append(Spacer(1, 0.2 * inch))
+    elements.append(Paragraph(f"Índice estructural: {round(data['risk'],2)}", styles["Normal"]))
+    elements.append(Spacer(1, 0.3 * inch))
+
+    doc.build(elements)
+    return file_path
 
 
 # ==========================================================
@@ -247,68 +298,112 @@ def absence_of_source_score(text: str):
 
 @app.get("/")
 def root():
-    return {"status": "GE SignalCheck API online"}
+    return {"status": "SignalCheck API v8 online"}
 
 
 # ==========================================================
-# ENDPOINT PRINCIPAL
+# VERIFY FREE
 # ==========================================================
 
 @app.post("/v3/verify")
 async def verify(request: Request, data: VerifyRequest):
 
-    extension_id = request.headers.get("x-extension-id")
-
-    if not extension_id:
-        raise HTTPException(status_code=401, detail="Extensión no identificada")
-
-    if extension_id.strip() not in ALLOWED_EXTENSIONS:
+    ext = request.headers.get("x-extension-id")
+    if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=403, detail="Extensión no autorizada")
 
-    if len(data.text.strip()) < 30:
-        raise HTTPException(status_code=400, detail="Texto insuficiente")
-
-    trust_score, s_signals, domain_type = structural_score(data.url, data.text)
-    r_score, r_signals = rhetorical_score(data.text, domain_type)
-    n_score, n_signals = narrative_score(data.text, domain_type)
-    a_score, a_signals = absence_of_source_score(data.text)
-
-    risk_index = (
-        (0.30 * r_score) +
-        (0.25 * n_score) +
-        (0.20 * a_score) +
-        (0.25 * (1 - trust_score))
-    )
-
-    if domain_type == "traditional_media":
-        risk_index *= 0.85
-
-    if domain_type == "social":
-        risk_index = max(risk_index, 0.35)
-
-    risk_index = max(0.0, min(risk_index, 1.0))
-
-    context_warning = None
-
-    if n_score >= 0.4:
-        context_warning = "Posible relato ficcional presentado como hecho real"
-    elif a_score >= 0.3:
-        context_warning = "Contenido sin referencias externas visibles"
-    elif r_score >= 0.4:
-        context_warning = "Lenguaje emocional o dramatizado"
+    analysis = collect_analysis(data.url, data.text)
+    log_daily_metrics(analysis["risk"], premium=False)
 
     return {
-        "structural_trust_score": round(trust_score, 2),
-        "source_type": domain_type,
-        "rhetorical_manipulation_score": round(r_score, 2),
-        "narrative_risk_score": round(n_score, 2),
-        "absence_of_source_score": round(a_score, 2),
-        "risk_index": round(risk_index, 2),
-        "context_warning": context_warning,
-        "details": {
-            "structural_signals": s_signals,
-            "rhetorical_signals": r_signals,
-            "narrative_signals": n_signals,
-            "source_signals": a_signals
-        }
+        "level": map_score_to_level(analysis["risk"]),
+        "indicators": analysis["signals"][:5],
+        "premium_available": True
     }
+
+
+# ==========================================================
+# PREMIUM PDF
+# ==========================================================
+
+@app.post("/v3/report")
+async def report(request: Request, data: VerifyRequest, background_tasks: BackgroundTasks):
+
+    token = request.headers.get("x-premium-token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Acceso premium requerido")
+
+    analysis = collect_analysis(data.url, data.text)
+    log_daily_metrics(analysis["risk"], premium=True)
+
+    file_path = generate_pdf(analysis, data.url)
+    background_tasks.add_task(os.remove, file_path)
+
+    return FileResponse(
+        file_path,
+        filename="signalcheck_informe.pdf",
+        media_type="application/pdf"
+    )
+
+
+# ==========================================================
+# METRICS ENDPOINTS
+# ==========================================================
+
+@app.get("/metrics/daily")
+def get_daily_metrics():
+    db = SessionLocal()
+    data = db.query(models.DailyMetrics).all()
+    db.close()
+    return data
+
+
+@app.get("/metrics/summary")
+def metrics_summary():
+    db = SessionLocal()
+    total = db.query(models.DailyMetrics).count()
+    db.close()
+    return {"total_days_recorded": total}
+
+
+@app.get("/metrics/internal")
+def internal_metrics():
+    db = SessionLocal()
+    try:
+        week_ago = datetime.utcnow() - timedelta(days=7)
+        
+        by_event = db.query(
+            models.AnonymousEvent.event_name,
+            func.count(models.AnonymousEvent.id).label("count")
+        ).filter(
+            models.AnonymousEvent.timestamp >= week_ago
+        ).group_by(models.AnonymousEvent.event_name).all()
+
+        by_country = db.query(
+            models.AnonymousEvent.country,
+            func.count(models.AnonymousEvent.id).label("count")
+        ).filter(
+            models.AnonymousEvent.timestamp >= week_ago,
+            models.AnonymousEvent.country != "XX"
+        ).group_by(models.AnonymousEvent.country).all()
+
+        total_verifies = db.query(func.count(models.AnonymousEvent.id)).filter(
+            models.AnonymousEvent.event_name == "verify_call",
+            models.AnonymousEvent.timestamp >= week_ago
+        ).scalar()
+        
+        premium_requests = db.query(func.count(models.AnonymousEvent.id)).filter(
+            models.AnonymousEvent.event_name == "premium_request",
+            models.AnonymousEvent.timestamp >= week_ago
+        ).scalar()
+
+        conversion_rate = round((premium_requests / total_verifies * 100), 2) if total_verifies else 0
+
+        return {
+            "weekly_events": {e.event_name: e.count for e in by_event},
+            "top_countries": {c.country: c.count for c in by_country},
+            "conversion_rate_percent": conversion_rate,
+            "total_weekly": sum(e.count for e in by_event)
+        }
+    finally:
+        db.close()
