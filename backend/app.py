@@ -201,17 +201,19 @@ def log_daily_metrics(risk_value, premium=False):
 # ==========================================================
 
 def get_country_from_ip(ip: str) -> str:
-    if not ip or ip in ["127.0.0.1", "::1"]:
+    if not ip or ip in ["127.0.0.1", "::1", "unknown", None]:
         return "XX"
     try:
+        # URL corregida: sin espacios
         response = requests.get(f"https://ipapi.co/{ip}/country_code/", timeout=2)
         if response.status_code == 200:
             country = response.text.strip().upper()
-            return country if len(country) == 2 else "XX"
-    except:
+            if len(country) == 2 and country.isalpha():
+                return country
+    except Exception as e:
+        print(f"⚠️ Error al obtener país para IP {ip}: {e}")
         pass
     return "XX"
-
 
 # ==========================================================
 # EVENT TRACKING
