@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const labelBadge = document.getElementById("labelBadge");
   const errorDiv = document.getElementById("error");
 
+  // ✅ URL CORREGIDA: sin espacios al final
   const API_URL = "https://ge-signal-check-production.up.railway.app/v3/verify";
 
   // ======================================================
@@ -14,99 +15,65 @@ document.addEventListener("DOMContentLoaded", () => {
   // ======================================================
 
   analyzeBtn.addEventListener("click", async () => {
-
     resetUI();
     console.log("🔎 Analizando página...");
 
     try {
-
       const tab = await getActiveTab();
       const extracted = await getPageText(tab);
 
-      if (!extracted || !extracted.text || extracted.text.length < 50) {
+      // ✅ Permite texto corto (no falla si es <50 chars)
+      if (!extracted || !extracted.text) {
         showError("No se pudo extraer texto significativo.");
         return;
       }
 
       const result = await callBackend(extracted);
-
-      if (!result) {
-        showError("Respuesta inválida del servidor.");
-        return;
-      }
-
       updateUI(result);
 
     } catch (err) {
       console.error("🔥 ERROR GENERAL:", err);
       showError(err?.message || "Error inesperado");
     }
-
   });
 
-// =====================================================
-// TAB
-// =====================================================
+  // =====================================================
+  // TAB
+  // =====================================================
 
-async function getActiveTab() {
+  async function getActiveTab() {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tabs.length) throw new Error("No se encontró pestaña activa.");
 
-  const tabs = await chrome.tabs.query({
-    active: true,
-    currentWindow: true
-  });
+    const tab = tabs[0];
+    if (!tab.id) throw new Error("ID de pestaña inválido.");
+    if (!tab.url) throw new Error("No se pudo obtener la URL.");
 
-  if (!tabs || tabs.length === 0) {
-    throw new Error("No se encontró pestaña activa.");
+    const blockedProtocols = [
+      "chrome://", "chrome-extension://", "edge://", "about:", "file://"
+    ];
+    if (blockedProtocols.some(p => tab.url.startsWith(p))) {
+      throw new Error("No se puede analizar esta página.");
+    }
+
+    return tab;
   }
-
-  const tab = tabs[0];
-
-  if (!tab.id) {
-    throw new Error("ID de pestaña inválido.");
-  }
-
-  if (!tab.url) {
-    throw new Error("No se pudo obtener la URL.");
-  }
-
-  // 🚫 Bloquear páginas donde no se puede inyectar
-  const blockedProtocols = [
-    "chrome://",
-    "chrome-extension://",
-    "edge://",
-    "about:",
-    "file://"
-  ];
-
-  if (blockedProtocols.some(protocol => tab.url.startsWith(protocol))) {
-    throw new Error("No se puede analizar esta página.");
-  }
-
-  return tab;
-}
 
   // ======================================================
-  // TEXT EXTRACTION
+  // TEXT EXTRACTION (robusto para SPA)
   // ======================================================
 
   async function getPageText(tab) {
-
     try {
-      return await chrome.tabs.sendMessage(tab.id, { action: "extractText" });
+      return await chrome.tabs.sendMessage(tab.id, { action: "getText" });
     } catch (err) {
-
-      console.log("ℹ Reiniciando conexión con la página...");
-
-      // Inyección manual (MV3 fallback)
+      console.log("ℹ Reintentando con fallback...");
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         files: ["content_script.js"]
       });
-
-      // pequeño delay para asegurar registro del listener
-      await new Promise(resolve => setTimeout(resolve, 150));
-
-      return await chrome.tabs.sendMessage(tab.id, { action: "extractText" });
+      await new Promise(resolve => setTimeout(resolve, 1200)); // Espera 1.2s para SPA
+      return await chrome.tabs.sendMessage(tab.id, { action: "getText" });
     }
   }
 
@@ -115,12 +82,8 @@ async function getActiveTab() {
   // ======================================================
 
   async function callBackend(extracted) {
-
     const extensionId = chrome.runtime.id;
-
-    if (!extensionId) {
-      throw new Error("No se pudo obtener ID de extensión.");
-    }
+    if (!extensionId) throw new Error("No se pudo obtener ID de extensión.");
 
     const response = await fetch(API_URL, {
       method: "POST",
@@ -130,25 +93,24 @@ async function getActiveTab() {
       },
       body: JSON.stringify({
         url: extracted.url,
-        text: extracted.text
+        text: extracted.text.substring(0, 15000) // límite seguro
       })
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ HTTP ERROR:", response.status, errorText);
-      throw new Error("Error del servidor (" + response.status + ")");
+      const errorMsg = await response.text();
+      console.error("❌ HTTP ERROR:", response.status, errorMsg);
+      throw new Error(`Error del servidor (${response.status})`);
     }
 
     return await response.json();
   }
 
   // ======================================================
-  // UI
+  // UI UPDATE
   // ======================================================
 
   function resetUI() {
-
     errorDiv.style.display = "none";
     errorDiv.textContent = "";
 
@@ -156,7 +118,6 @@ async function getActiveTab() {
     labelBadge.className = "signal-label";
 
     scoreValue.textContent = "0.00";
-
     confidenceBar.style.width = "0%";
     confidenceBar.className = "confidence-bar";
 
@@ -164,32 +125,30 @@ async function getActiveTab() {
   }
 
   function updateUI(data) {
-
-    if (typeof data.risk_index !== "number") {
+    // ✅ Usa data.level (no risk_index)
+    if (!data.level || typeof data.level !== "string") {
       showError("Respuesta inválida del servidor.");
       return;
     }
 
-    const risk = Math.max(0, Math.min(1, data.risk_index));
+    let risk = 0;
+    if (data.level === "bajo") risk = 0.2;
+    else if (data.level === "medio") risk = 0.5;
+    else if (data.level === "alto") risk = 0.8;
 
     scoreValue.textContent = risk.toFixed(2);
     confidenceBar.style.width = (risk * 100) + "%";
 
+    // Limpiar clases
     labelBadge.className = "signal-label";
     confidenceBar.className = "confidence-bar";
 
     signalsList.innerHTML = "";
 
-    // Recolectar señales
-    const allSignals = [
-      ...(data?.details?.structural_signals || []),
-      ...(data?.details?.rhetorical_signals || []),
-      ...(data?.details?.narrative_signals || []),
-      ...(data?.details?.source_signals || [])
-    ];
-
-    if (allSignals.length > 0) {
-      allSignals.forEach(signal => {
+    // Mostrar señales (si vienen en 'indicators')
+    const indicators = data.indicators || [];
+    if (indicators.length > 0) {
+      indicators.slice(0, 5).forEach(signal => {
         const li = document.createElement("li");
         li.textContent = signal;
         signalsList.appendChild(li);
@@ -198,32 +157,15 @@ async function getActiveTab() {
       signalsList.innerHTML = "<li>No se detectaron señales relevantes</li>";
     }
 
-    // Advertencia contextual prioritaria
-    if (data.context_warning) {
-
-      labelBadge.textContent = "Advertencia Contextual";
-      labelBadge.classList.add("risk-medium");
-      confidenceBar.classList.add("bar-medium");
-
-      const warningLi = document.createElement("li");
-      warningLi.textContent = "⚠ " + data.context_warning;
-      warningLi.style.fontWeight = "bold";
-
-      signalsList.prepend(warningLi);
-      return;
-    }
-
-    // Escala normal
-    if (risk < 0.35) {
+    // Estilo según nivel
+    if (data.level === "bajo") {
       labelBadge.textContent = "Riesgo Bajo";
       labelBadge.classList.add("risk-low");
       confidenceBar.classList.add("bar-low");
-
-    } else if (risk < 0.65) {
+    } else if (data.level === "medio") {
       labelBadge.textContent = "Riesgo Medio";
       labelBadge.classList.add("risk-medium");
       confidenceBar.classList.add("bar-medium");
-
     } else {
       labelBadge.textContent = "Riesgo Alto";
       labelBadge.classList.add("risk-high");
@@ -232,7 +174,6 @@ async function getActiveTab() {
   }
 
   function showError(message) {
-
     errorDiv.textContent = message;
     errorDiv.style.display = "block";
 

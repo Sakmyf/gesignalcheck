@@ -6,7 +6,6 @@ print("VERSION EXTENSION-ID ACTIVA - ESCALABLE METRICS")
 import re
 import uuid
 import os
-import requests
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
@@ -197,63 +196,12 @@ def log_daily_metrics(risk_value, premium=False):
 
 
 # ==========================================================
-# COUNTRY DETECTION (sin guardar IP)
-# ==========================================================
-
-def get_country_from_ip(ip: str) -> str:
-    if not ip or ip in ["127.0.0.1", "::1", "unknown", None]:
-        return "XX"
-    try:
-        # URL corregida: sin espacios
-        response = requests.get(f"https://ipapi.co/{ip}/country_code/", timeout=2)
-        if response.status_code == 200:
-            country = response.text.strip().upper()
-            if len(country) == 2 and country.isalpha():
-                return country
-    except Exception as e:
-        print(f"⚠️ Error al obtener país para IP {ip}: {e}")
-        pass
-    return "XX"
-
-# ==========================================================
-# EVENT TRACKING
-# ==========================================================
-
-@app.post("/event")
-async def log_event(event: EventRequest, request: Request):
-    allowed_events = {
-        "landing_view", "click_install", "verify_call", 
-        "premium_request", "pdf_generated"
-    }
-    if event.event_name not in allowed_events:
-        raise HTTPException(status_code=400, detail="Evento no permitido")
-    
-    if event.user_type not in ["free", "premium"]:
-        event.user_type = "free"
-    
-    client_ip = request.client.host if request.client else "127.0.0.1"
-    country = get_country_from_ip(client_ip)
-    
-    db = SessionLocal()
-    try:
-        new_event = models.AnonymousEvent(
-            event_name=event.event_name,
-            country=country,
-            user_type=event.user_type
-        )
-        db.add(new_event)
-        db.commit()
-        return {"status": "logged"}
-    finally:
-        db.close()
-
-
-# ==========================================================
 # PDF GENERATOR
 # ==========================================================
 
 def fetch_logo():
     try:
+        import requests
         r = requests.get(LOGO_URL, timeout=5)
         path = "/tmp/logo.png"
         with open(path, "wb") as f:
@@ -346,6 +294,43 @@ async def report(request: Request, data: VerifyRequest, background_tasks: Backgr
         filename="signalcheck_informe.pdf",
         media_type="application/pdf"
     )
+
+
+# ==========================================================
+# EVENT TRACKING (con Cloudflare CF-IPCountry)
+# ==========================================================
+
+@app.post("/event")
+async def log_event(event: EventRequest, request: Request):
+    allowed_events = {
+        "landing_view", "click_install", "verify_call", 
+        "premium_request", "pdf_generated"
+    }
+    if event.event_name not in allowed_events:
+        raise HTTPException(status_code=400, detail="Evento no permitido")
+    
+    if event.user_type not in ["free", "premium"]:
+        event.user_type = "free"
+    
+    # ✅ País desde Cloudflare — seguro, anónimo, sin llamadas externas
+    country = request.headers.get("CF-IPCountry", "XX")
+    if not country or len(country) != 2 or not country.isalpha():
+        country = "XX"
+    else:
+        country = country.upper()
+
+    db = SessionLocal()
+    try:
+        new_event = models.AnonymousEvent(
+            event_name=event.event_name,
+            country=country,
+            user_type=event.user_type
+        )
+        db.add(new_event)
+        db.commit()
+        return {"status": "logged"}
+    finally:
+        db.close()
 
 
 # ==========================================================
