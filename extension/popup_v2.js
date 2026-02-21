@@ -7,7 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const labelBadge = document.getElementById("labelBadge");
   const errorDiv = document.getElementById("error");
 
-  // ✅ URL CORREGIDA: sin espacios al final
+  // ✅ URL CORREGIDA: SIN ESPACIOS AL FINAL
   const API_URL = "https://ge-signal-check-production.up.railway.app/v3/verify";
 
   // ======================================================
@@ -22,7 +22,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const tab = await getActiveTab();
       const extracted = await getPageText(tab);
 
-      // ✅ Permite texto corto (no falla si es <50 chars)
       if (!extracted || !extracted.text) {
         showError("No se pudo extraer texto significativo.");
         return;
@@ -60,7 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ======================================================
-  // TEXT EXTRACTION (robusto para SPA)
+  // TEXT EXTRACTION (robusto para SPA como iProfesional)
   // ======================================================
 
   async function getPageText(tab) {
@@ -72,7 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
         target: { tabId: tab.id },
         files: ["content_script.js"]
       });
-      await new Promise(resolve => setTimeout(resolve, 1200)); // Espera 1.2s para SPA
+      await new Promise(resolve => setTimeout(resolve, 1200));
       return await chrome.tabs.sendMessage(tab.id, { action: "getText" });
     }
   }
@@ -93,7 +92,7 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       body: JSON.stringify({
         url: extracted.url,
-        text: extracted.text.substring(0, 15000) // límite seguro
+        text: extracted.text.substring(0, 15000)
       })
     });
 
@@ -125,7 +124,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateUI(data) {
-    // ✅ Usa data.level (no risk_index)
     if (!data.level || typeof data.level !== "string") {
       showError("Respuesta inválida del servidor.");
       return;
@@ -139,13 +137,11 @@ document.addEventListener("DOMContentLoaded", () => {
     scoreValue.textContent = risk.toFixed(2);
     confidenceBar.style.width = (risk * 100) + "%";
 
-    // Limpiar clases
     labelBadge.className = "signal-label";
     confidenceBar.className = "confidence-bar";
 
     signalsList.innerHTML = "";
 
-    // Mostrar señales (si vienen en 'indicators')
     const indicators = data.indicators || [];
     if (indicators.length > 0) {
       indicators.slice(0, 5).forEach(signal => {
@@ -157,7 +153,6 @@ document.addEventListener("DOMContentLoaded", () => {
       signalsList.innerHTML = "<li>No se detectaron señales relevantes</li>";
     }
 
-    // Estilo según nivel
     if (data.level === "bajo") {
       labelBadge.textContent = "Riesgo Bajo";
       labelBadge.classList.add("risk-low");
