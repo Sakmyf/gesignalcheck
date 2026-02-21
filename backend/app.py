@@ -15,27 +15,12 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import func
 
-from reportlab.platypus import (
-    SimpleDocTemplate,
-    Paragraph,
-    Spacer,
-    Table,
-    Image
-)
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
-from reportlab.lib.units import inch
-from reportlab.lib.pagesizes import A4
-from reportlab.platypus import TableStyle
-
-
 # ==========================================================
 # CONFIG
 # ==========================================================
 
 ENGINE_VERSION = "v8.0"
 LOGO_URL = "https://gesignalcheck.com/assets/logo.png"
-LOGO_WIDTH_INCH = 1.2
 
 ALLOWED_EXTENSIONS = [
     "fijnjbaacmpnhaaconoafbmnholbmaig"
@@ -196,50 +181,75 @@ def log_daily_metrics(risk_value, premium=False):
 
 
 # ==========================================================
-# PDF GENERATOR
+# PDF GENERATOR (con imports locales)
 # ==========================================================
 
-def fetch_logo():
-    try:
-        import requests
-        r = requests.get(LOGO_URL, timeout=5)
-        path = "/tmp/logo.png"
-        with open(path, "wb") as f:
-            f.write(r.content)
-        return path
-    except:
-        return None
-
-
 def generate_pdf(data, url):
-    file_id = str(uuid.uuid4())
-    file_path = f"/tmp/report_{file_id}.pdf"
+    try:
+        # Importar solo cuando se necesita → evita fallos al iniciar
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.colors import HexColor
+        import requests
+        import io
 
-    doc = SimpleDocTemplate(file_path, pagesize=A4)
-    elements = []
-    styles = getSampleStyleSheet()
+        file_id = str(uuid.uuid4())
+        file_path = f"/tmp/report_{file_id}.pdf"
+        doc = SimpleDocTemplate(file_path, pagesize=A4)
+        elements = []
+        styles = getSampleStyleSheet()
 
-    logo = fetch_logo()
-    if logo:
-        img = Image(logo)
-        img.drawWidth = LOGO_WIDTH_INCH * inch
-        img.drawHeight = LOGO_WIDTH_INCH * inch
-        img.hAlign = "CENTER"
-        elements.append(img)
+        # Estilo personalizado
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            spaceAfter=12,
+            textColor=HexColor("#2c3e50")
+        )
+        normal_style = styles["Normal"]
+        normal_style.fontSize = 10
+
+        # Logo (opcional)
+        try:
+            r = requests.get(LOGO_URL, timeout=3)
+            if r.status_code == 200:
+                logo_data = io.BytesIO(r.content)
+                img = Image(logo_data)
+                img.drawWidth = 1.2 * inch
+                img.drawHeight = 1.2 * inch
+                img.hAlign = "CENTER"
+                elements.append(img)
+                elements.append(Spacer(1, 0.2 * inch))
+        except:
+            pass  # Sin logo si falla
+
+        # Contenido
+        elements.append(Paragraph("SignalCheck – Informe Estructural", title_style))
         elements.append(Spacer(1, 0.2 * inch))
+        elements.append(Paragraph(f"<b>Fecha:</b> {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}", normal_style))
+        elements.append(Paragraph(f"<b>Motor:</b> {ENGINE_VERSION}", normal_style))
+        elements.append(Paragraph(f"<b>URL analizada:</b> {url}", normal_style))
+        elements.append(Spacer(1, 0.3 * inch))
 
-    elements.append(Paragraph("SignalCheck – Informe Estructural", styles["Heading1"]))
-    elements.append(Spacer(1, 0.3 * inch))
-    elements.append(Paragraph(f"Fecha: {datetime.utcnow()}", styles["Normal"]))
-    elements.append(Paragraph(f"Motor: {ENGINE_VERSION}", styles["Normal"]))
-    elements.append(Spacer(1, 0.2 * inch))
-    elements.append(Paragraph(f"URL: {url}", styles["Normal"]))
-    elements.append(Spacer(1, 0.2 * inch))
-    elements.append(Paragraph(f"Índice estructural: {round(data['risk'],2)}", styles["Normal"]))
-    elements.append(Spacer(1, 0.3 * inch))
+        risk_level = data.get('risk', 0)
+        elements.append(Paragraph(f"<b>Índice de Riesgo Estructural:</b> {risk_level:.2f}", normal_style))
 
-    doc.build(elements)
-    return file_path
+        all_signals = data.get("signals", [])
+        if all_signals:
+            elements.append(Spacer(1, 0.2 * inch))
+            elements.append(Paragraph("<b>Señales detectadas:</b>", normal_style))
+            for signal in all_signals[:5]:
+                elements.append(Paragraph(f"• {signal}", normal_style))
+
+        doc.build(elements)
+        return file_path
+
+    except Exception as e:
+        print(f"Error generando PDF: {e}")
+        raise HTTPException(status_code=500, detail="Error al generar informe PDF")
 
 
 # ==========================================================
@@ -312,7 +322,7 @@ async def log_event(event: EventRequest, request: Request):
     if event.user_type not in ["free", "premium"]:
         event.user_type = "free"
     
-    # ✅ País desde Cloudflare — seguro, anónimo, sin llamadas externas
+    # País desde Cloudflare — seguro y anónimo
     country = request.headers.get("CF-IPCountry", "XX")
     if not country or len(country) != 2 or not country.isalpha():
         country = "XX"
