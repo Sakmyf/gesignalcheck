@@ -14,46 +14,60 @@ if (!window.__SignalCheckInjected__) {
   // ------------------------------------------------------
   function extractCleanText() {
 
-    if (!document.body) return "";
+  if (!document.body) return "";
 
-    try {
+  try {
 
-      // Clonar body para no tocar DOM real
-      const clonedBody = document.body.cloneNode(true);
+    // 1️⃣ Priorizar <main> si existe (SPA modernas)
+    let container = document.querySelector("main");
 
-      // Remover elementos no relevantes
-      const elementsToRemove = clonedBody.querySelectorAll(
-        "script, style, noscript, svg, img, video, canvas, iframe"
-      );
-
-      elementsToRemove.forEach(el => el.remove());
-
-      let text = clonedBody.innerText || "";
-
-      // Normalizar espacios
-      text = text.replace(/\s+/g, " ").trim();
-
-      // Límite defensivo
-      return text.substring(0, 15000);
-
-    } catch (err) {
-
-      console.warn("⚠ Fallback extracción directa:", err);
-
-      return (document.body.innerText || "")
-        .replace(/\s+/g, " ")
-        .trim()
-        .substring(0, 15000);
+    // 2️⃣ Si no existe main, usar body
+    if (!container) {
+      container = document.body;
     }
+
+    // 3️⃣ Clonar el contenedor principal
+    const cloned = container.cloneNode(true);
+
+    // 4️⃣ Remover elementos irrelevantes
+    const elementsToRemove = cloned.querySelectorAll(
+      "script, style, noscript, svg, img, video, canvas, iframe, header, footer"
+    );
+
+    elementsToRemove.forEach(el => el.remove());
+
+    let text = cloned.innerText || "";
+
+    // 5️⃣ Normalizar espacios
+    text = text.replace(/\s+/g, " ").trim();
+
+    // 6️⃣ Protección contra textos vacíos
+    if (text.length < 200) {
+      // Fallback total
+      text = (document.body.innerText || "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    return text.substring(0, 20000);
+
+  } catch (err) {
+
+    console.warn("⚠ Fallback extracción directa:", err);
+
+    return (document.body.innerText || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .substring(0, 20000);
   }
+}
 
   // ------------------------------------------------------
   // LISTENER ÚNICO
   // ------------------------------------------------------
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
-    // ✅ Unificado con service_worker.js
-    if (!request || request.action !== "getText") {
+    if (!request || request.action !== "extractText") {
       return;
     }
 

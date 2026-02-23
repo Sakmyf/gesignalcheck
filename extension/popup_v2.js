@@ -62,19 +62,41 @@ document.addEventListener("DOMContentLoaded", () => {
   // TEXT EXTRACTION (robusto para SPA como iProfesional)
   // ======================================================
 
-  async function getPageText(tab) {
-    try {
-      return await chrome.tabs.sendMessage(tab.id, { action: "getText" });
-    } catch (err) {
-      console.log("ℹ Reintentando con fallback...");
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ["content_script.js"]
-      });
-      await new Promise(resolve => setTimeout(resolve, 1200));
-      return await chrome.tabs.sendMessage(tab.id, { action: "getText" });
-    }
-  }
+ async function getPageText(tab) {
+
+  // 1️⃣ Inyectar siempre el content script antes de pedir texto
+  await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    files: ["content_script.js"]
+  });
+
+  // 2️⃣ Esperar un poco (SPA rendering)
+  await new Promise(resolve => setTimeout(resolve, 800));
+
+  // 3️⃣ Enviar mensaje correctamente (MV3-safe)
+  return new Promise((resolve, reject) => {
+
+    chrome.tabs.sendMessage(
+      tab.id,
+      { action: "extractText" },
+      (response) => {
+
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+
+        if (!response) {
+          reject(new Error("Sin respuesta del content script"));
+          return;
+        }
+
+        resolve(response);
+      }
+    );
+
+  });
+}
 
   // ======================================================
   // BACKEND CALL
