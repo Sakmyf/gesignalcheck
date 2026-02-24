@@ -79,7 +79,8 @@ async def verify(
     if len(data.text.strip()) < 30:
         raise HTTPException(status_code=400, detail="Texto insuficiente")
 
-        result = analyze_context(data.text, data.url)
+    # 👇 ESTA LÍNEA VA AL MISMO NIVEL QUE LOS IF
+    result = analyze_context(data.text, data.url or "")
 
     status_color, level = interpret_score(result["score"])
 
