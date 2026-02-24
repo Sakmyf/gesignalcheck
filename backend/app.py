@@ -1,5 +1,5 @@
 print("VERSION EXTENSION-ID ACTIVA")
-
+from engine import analyze_context, interpret_score
 import re
 import uuid
 from urllib.parse import urlparse
@@ -79,24 +79,24 @@ async def verify(
     if len(data.text.strip()) < 30:
         raise HTTPException(status_code=400, detail="Texto insuficiente")
 
+        result = analyze_context(data.text, data.url)
+
+    status_color, level = interpret_score(result["score"])
+
     return {
         "analysis": {
-            "level": "bajo",
-            "summary": "No se observan concentraciones significativas de señales estructurales.",
+            "level": level,
+            "summary": result["label"],
             "indicators": [
                 {
-                    "title": "estructura clara",
-                    "explanation": "Indicador estructural observado durante el análisis automatizado.",
-                    "orientation": "neutro"
-                },
-                {
-                    "title": "tono neutro",
-                    "explanation": "Indicador estructural observado durante el análisis automatizado.",
-                    "orientation": "neutro"
+                    "title": s,
+                    "explanation": "Señal estructural detectada durante el análisis contextual.",
+                    "orientation": "alerta" if status_color != "green" else "neutro"
                 }
+                for s in result["signals"][:5]
             ],
-            "shown_indicators": 2,
-            "note": "Se muestran los indicadores estructurales más relevantes para esta evaluación."
+            "shown_indicators": len(result["signals"][:5]),
+            "note": "Se muestran las señales estructurales más relevantes para esta evaluación."
         },
         "meta": {
             "premium_available": True,

@@ -146,49 +146,52 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateUI(data) {
-    if (!data.level || typeof data.level !== "string") {
-      showError("Respuesta inválida del servidor.");
-      return;
-    }
 
-    let risk = 0;
-    if (data.level === "bajo") risk = 0.2;
-    else if (data.level === "medio") risk = 0.5;
-    else if (data.level === "alto") risk = 0.8;
-
-    scoreValue.textContent = risk.toFixed(2);
-    confidenceBar.style.width = (risk * 100) + "%";
-
-    labelBadge.className = "signal-label";
-    confidenceBar.className = "confidence-bar";
-
-    signalsList.innerHTML = "";
-
-    const indicators = data.indicators || [];
-    if (indicators.length > 0) {
-      indicators.slice(0, 5).forEach(signal => {
-        const li = document.createElement("li");
-        li.textContent = signal;
-        signalsList.appendChild(li);
-      });
-    } else {
-      signalsList.innerHTML = "<li>No se detectaron señales relevantes</li>";
-    }
-
-    if (data.level === "bajo") {
-      labelBadge.textContent = "Riesgo Bajo";
-      labelBadge.classList.add("risk-low");
-      confidenceBar.classList.add("bar-low");
-    } else if (data.level === "medio") {
-      labelBadge.textContent = "Riesgo Medio";
-      labelBadge.classList.add("risk-medium");
-      confidenceBar.classList.add("bar-medium");
-    } else {
-      labelBadge.textContent = "Riesgo Alto";
-      labelBadge.classList.add("risk-high");
-      confidenceBar.classList.add("bar-high");
-    }
+  if (!data.analysis || !data.analysis.level) {
+    showError("Respuesta inválida del servidor.");
+    return;
   }
+
+  const level = data.analysis.level;
+  const indicators = data.analysis.indicators || [];
+
+  let risk = 0;
+  if (level === "bajo") risk = 0.2;
+  else if (level === "medio") risk = 0.5;
+  else if (level === "alto") risk = 0.8;
+
+  scoreValue.textContent = risk.toFixed(2);
+  confidenceBar.style.width = (risk * 100) + "%";
+
+  labelBadge.className = "signal-label";
+  confidenceBar.className = "confidence-bar";
+
+  signalsList.innerHTML = "";
+
+  if (indicators.length > 0) {
+    indicators.slice(0, 5).forEach(signal => {
+      const li = document.createElement("li");
+      li.textContent = signal.title;   // ← importante
+      signalsList.appendChild(li);
+    });
+  } else {
+    signalsList.innerHTML = "<li>No se detectaron señales relevantes</li>";
+  }
+
+  if (level === "bajo") {
+    labelBadge.textContent = "Riesgo Bajo";
+    labelBadge.classList.add("risk-low");
+    confidenceBar.classList.add("bar-low");
+  } else if (level === "medio") {
+    labelBadge.textContent = "Riesgo Medio";
+    labelBadge.classList.add("risk-medium");
+    confidenceBar.classList.add("bar-medium");
+  } else {
+    labelBadge.textContent = "Riesgo Alto";
+    labelBadge.classList.add("risk-high");
+    confidenceBar.classList.add("bar-high");
+  }
+}
 
   function showError(message) {
     errorDiv.textContent = message;
