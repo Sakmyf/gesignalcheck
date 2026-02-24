@@ -62,21 +62,23 @@ def root():
 # ENDPOINT PUBLICO
 # ==========================================================
 
+from fastapi import Header
+
 @app.post("/v3/verify")
-async def verify(request: Request, data: VerifyRequest):
+async def verify(
+    data: VerifyRequest,
+    x_extension_id: str = Header(None)
+):
 
-    extension_id = request.headers.get("x-extension-id")
-
-    if not extension_id:
+    if not x_extension_id:
         raise HTTPException(status_code=401, detail="Extensión no identificada")
 
-    if extension_id.strip() not in ALLOWED_EXTENSIONS:
+    if x_extension_id.strip() not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=403, detail="Extensión no autorizada")
 
     if len(data.text.strip()) < 30:
         raise HTTPException(status_code=400, detail="Texto insuficiente")
 
-    # RESPUESTA ESTABLE PARA TEST
     return {
         "analysis": {
             "level": "bajo",
@@ -102,17 +104,17 @@ async def verify(request: Request, data: VerifyRequest):
         }
     }
 
-
 # ==========================================================
 # ENDPOINT PREMIUM JSON
 # ==========================================================
 
 @app.post("/v3/verify/premium")
-async def verify_premium(request: Request, data: VerifyRequest):
+async def verify_premium(
+    data: VerifyRequest,
+    x_premium_token: str = Header(None)
+):
 
-    premium_token = request.headers.get("x-premium-token")
-
-    if not premium_token:
+    if not x_premium_token:
         raise HTTPException(status_code=401, detail="Acceso premium requerido")
 
     return {
@@ -129,17 +131,17 @@ async def verify_premium(request: Request, data: VerifyRequest):
         }
     }
 
-
 # ==========================================================
 # ENDPOINT PDF PREMIUM
 # ==========================================================
 
 @app.post("/v3/report")
-async def generate_report(request: Request, data: VerifyRequest):
+async def generate_report(
+    data: VerifyRequest,
+    x_premium_token: str = Header(None)
+):
 
-    premium_token = request.headers.get("x-premium-token")
-
-    if not premium_token:
+    if not x_premium_token:
         raise HTTPException(status_code=401, detail="Acceso premium requerido")
 
     return {"status": "PDF endpoint activo"}

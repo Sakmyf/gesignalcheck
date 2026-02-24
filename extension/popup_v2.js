@@ -8,7 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const errorDiv = document.getElementById("error");
 
   // ✅ URL CORREGIDA: SIN ESPACIOS AL FINAL
-  const API_URL = "https://ge-signal-check-production.up.railway.app/v3/verify";
+  const API_URL = "https://gesignalcheck-production-8e78.up.railway.app/v3/verify";
 
   // ======================================================
   // MAIN CLICK HANDLER
