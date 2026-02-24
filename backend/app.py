@@ -1,5 +1,5 @@
 print("VERSION EXTENSION-ID ACTIVA")
-from engine import analyze_context, interpret_score
+from backend.engine import analyze_context, interpret_score
 import re
 import uuid
 from urllib.parse import urlparse
