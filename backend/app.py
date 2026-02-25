@@ -62,8 +62,6 @@ def root():
 # ENDPOINT PUBLICO
 # ==========================================================
 
-from fastapi import Header
-
 @app.post("/v3/verify")
 async def verify(
     data: VerifyRequest,
@@ -79,15 +77,7 @@ async def verify(
     if len(data.text.strip()) < 30:
         raise HTTPException(status_code=400, detail="Texto insuficiente")
 
-    # 👇 ESTA LÍNEA VA AL MISMO NIVEL QUE LOS IF
-
-print("----- DEBUG VERIFY -----")
-print("URL:", data.url)
-print("LONGITUD TEXTO:", len(data.text))
-print("PRIMEROS 300 CHARS:")
-print(data.text[:300])
-print("------------------------")
-
+    # 👇 MISMO NIVEL QUE LOS IF
     result = analyze_context(data.text, data.url or "")
 
     status_color, level = interpret_score(result["score"])
