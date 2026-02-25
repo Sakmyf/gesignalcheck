@@ -1,21 +1,37 @@
 # emotions.py
 import re
-from rules_types import RuleResult
+from backend.Analysis.rules_types import RuleResult
 
 EMOTION_PATTERNS = [
-    r"cansado de",
-    r"merecés",
-    r"tu vida va a cambiar",
-    r"libertad financiera",
-    r"viví como soñás",
+    r"indignación",
+    r"furia",
+    r"caos",
+    r"paralizada",
+    r"ataque",
+    r"escándalo",
+    r"urgente",
+    r"explosión",
+    r"estalló",
+    r"imparable",
+    r"terrible",
+    r"alarmante",
+    r"no vuelvas a",
 ]
 
 def check_emotions(text: str) -> RuleResult:
+
+    result = RuleResult()
+
+    matches = 0
+
     for p in EMOTION_PATTERNS:
         if re.search(p, text, re.I):
-            return RuleResult(
-                points=-0.15,
-                reasons=["emotional_manipulation"],
-                evidence=["Lenguaje emocional persuasivo"]
-            )
-    return RuleResult()
+            matches += 1
+
+    if matches >= 1:
+        # Escala leve, no exagerada
+        result.points += min(1.0, matches * 0.2)
+        result.reasons.append("emotional_intensity")
+        result.evidence.append("Narrativa emocional intensa")
+
+    return result
