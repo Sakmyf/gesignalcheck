@@ -1,10 +1,10 @@
-print("VERSION EXTENSION-ID ACTIVA")
+print("APP FILE ACTUAL 3.3")
 from backend.engine import analyze_context, interpret_score
 import re
 import uuid
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
