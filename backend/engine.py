@@ -84,3 +84,11 @@ def analyze_context(text: str, url: str = ""):
         "site_type": site_type,
         "raw_score": round(raw_score, 2)
     }
+
+def interpret_score(score: float):
+    if score < 0.25:
+        return "green", "bajo"
+    elif score < 0.55:
+        return "yellow", "medio"
+    else:
+        return "red", "alto"
