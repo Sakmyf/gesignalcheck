@@ -1,4 +1,4 @@
-print("APP FILE ACTUAL 3.4")
+print("APP FILE ACTUAL 9.9")
 
 from backend.engine import analyze_context, interpret_score
 from backend.utils.content_versioning import (
@@ -15,8 +15,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from database import engine
-from models import Base
+from backend.database import engine
+from backend.models import Base
 
 Base.metadata.create_all(bind=engine)
 
