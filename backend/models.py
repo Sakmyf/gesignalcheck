@@ -84,3 +84,24 @@ class AnalysisLog(Base):
     premium_requested = Column(Boolean, default=False)
 
     engine_version = Column(String(20))
+
+
+# ============================
+# EXTENSIONES AUTORIZADAS
+# ============================
+
+class Extension(Base):
+    __tablename__ = "extensions"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    extension_id = Column(String, unique=True, index=True, nullable=False)
+
+    is_active = Column(Boolean, default=True)
+
+    plan = Column(String, default="free")  # free / pro / enterprise
+
+    analyses_used = Column(Integer, default=0)
+    analyses_limit = Column(Integer, default=0)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
