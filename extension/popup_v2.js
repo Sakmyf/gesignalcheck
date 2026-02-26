@@ -1,3 +1,8 @@
+const API_URL = "https://gesignalcheck-production-8e78.up.railway.app/v3/verify";
+
+window.API_DEBUG = API_URL;
+console.log("POPUP CARGADO:", API_URL);
+
 document.addEventListener("DOMContentLoaded", () => {
 
   const analyzeBtn = document.getElementById("analyzeBtn");

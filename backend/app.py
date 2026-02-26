@@ -1,5 +1,11 @@
-print("APP FILE ACTUAL 3.3")
+print("APP FILE ACTUAL 3.4")
+
 from backend.engine import analyze_context, interpret_score
+from backend.utils.content_versioning import (
+    generate_content_hash,
+    build_analysis_key,
+)
+
 import re
 import uuid
 from urllib.parse import urlparse
@@ -19,10 +25,18 @@ from reportlab.platypus import TableStyle
 
 
 # ==========================================================
+# VERSION CONTROL
+# ==========================================================
+
+ENGINE_VERSION = "v8.5"
+PROMPT_VERSION = "none"  # Free mode no usa IA generativa
+
+
+# ==========================================================
 # FASTAPI INIT
 # ==========================================================
 
-app = FastAPI(title="GE SignalCheck API v7 - Production Stable")
+app = FastAPI(title="GE SignalCheck API v8 - Versioned Infrastructure Ready")
 
 app.add_middleware(
     CORSMiddleware,
@@ -68,6 +82,10 @@ async def verify(
     x_extension_id: str = Header(None)
 ):
 
+    # -------------------------
+    # VALIDACIONES DE SEGURIDAD
+    # -------------------------
+
     if not x_extension_id:
         raise HTTPException(status_code=401, detail="Extensión no identificada")
 
@@ -77,30 +95,40 @@ async def verify(
     if len(data.text.strip()) < 30:
         raise HTTPException(status_code=400, detail="Texto insuficiente")
 
-    # 👇 MISMO NIVEL QUE LOS IF
-    result = analyze_context(data.text, data.url or "")
+    # -------------------------
+    # ANALISIS PRINCIPAL
+    # -------------------------
 
-    status_color, level = interpret_score(result["score"])
+    analysis = analyze_context(data.text, data.url)
+
+    # Si analyze_context no devuelve site_type,
+    # lo determinamos desde la URL
+    parsed = urlparse(data.url)
+    site_type = parsed.netloc if parsed.netloc else "unknown"
+
+    # -------------------------
+    # VERSIONADO / TRAZABILIDAD
+    # -------------------------
+
+    content_hash = generate_content_hash(data.text)
+    analysis_key = build_analysis_key(data.url, data.text)
+
+    meta = {
+        "engine_version": "5.0",
+        "site_type": site_type,
+        "content_hash": content_hash,
+        "analysis_key": analysis_key,
+        "premium_available": True,
+        "disclaimer": "SignalCheck no determina veracidad. Ningún sistema automatizado reemplaza el juicio humano."
+    }
+
+    # -------------------------
+    # RESPUESTA FINAL
+    # -------------------------
 
     return {
-        "analysis": {
-            "level": level,
-            "summary": result["label"],
-            "indicators": [
-                {
-                    "title": s,
-                    "explanation": "Señal estructural detectada durante el análisis contextual.",
-                    "orientation": "alerta" if status_color != "green" else "neutro"
-                }
-                for s in result["signals"][:5]
-            ],
-            "shown_indicators": len(result["signals"][:5]),
-            "note": "Se muestran las señales estructurales más relevantes para esta evaluación."
-        },
-        "meta": {
-            "premium_available": True,
-            "disclaimer": "SignalCheck no determina veracidad. Ningún sistema automatizado reemplaza el juicio humano."
-        }
+        "analysis": analysis,
+        "meta": meta
     }
 
 # ==========================================================
@@ -129,6 +157,7 @@ async def verify_premium(
             ]
         }
     }
+
 
 # ==========================================================
 # ENDPOINT PDF PREMIUM

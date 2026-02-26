@@ -1,4 +1,5 @@
 print("ENGINE RULE ENGINE 5.0 ACTIVO")
+print("🔥 ENGINE.PY ACTIVO")
 
 from backend.Analysis.emotions import check_emotions
 from backend.Analysis.credibility import check_credibility
@@ -35,6 +36,8 @@ def detect_site_type(url: str) -> str:
 
 
 def analyze_context(text: str, url: str = ""):
+
+    print("🧠 ANALYZE_CONTEXT EJECUTADO")
 
     site_type = detect_site_type(url)
 
