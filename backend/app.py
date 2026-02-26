@@ -96,21 +96,13 @@ async def verify(
         raise HTTPException(status_code=400, detail="Texto insuficiente")
 
     # -------------------------
-    # ANALISIS PRINCIPAL
+    # DETERMINAR SITE TYPE
     # -------------------------
 
-    analysis = analyze_context(data.text, data.url)
-
-    # Si analyze_context no devuelve site_type,
-    # lo determinamos desde la URL
-    parsed = urlparse(data.url)
+    parsed = urlparse(data.url or "")
     site_type = parsed.netloc if parsed.netloc else "unknown"
 
     # -------------------------
-    # VERSIONADO / TRAZABILIDAD
-    # -------------------------
-
-       # -------------------------
     # VERSIONADO / TRAZABILIDAD
     # -------------------------
 
@@ -123,23 +115,44 @@ async def verify(
         prompt_version=PROMPT_VERSION,
     )
 
-    meta = {
-        "engine_version": "5.0",
-        "site_type": site_type,
-        "content_hash": content_hash,
-        "analysis_key": analysis_key,
-        "premium_available": True,
-        "disclaimer": "SignalCheck no determina veracidad. Ningún sistema automatizado reemplaza el juicio humano."
-    }
+    # -------------------------
+    # ANALISIS PRINCIPAL
+    # -------------------------
+
+    result = analyze_context(data.text, data.url or "")
+    status_color, level = interpret_score(result["score"])
+
+    indicators = [
+        {
+            "title": s,
+            "explanation": "Señal estructural detectada durante el análisis contextual.",
+            "orientation": "alerta" if status_color != "green" else "neutro"
+        }
+        for s in result.get("signals", [])[:5]
+    ]
 
     # -------------------------
     # RESPUESTA FINAL
     # -------------------------
 
     return {
-        "analysis": analysis,
-        "meta": meta
+        "analysis": {
+            "level": level,
+            "summary": "requiere lectura crítica",
+            "indicators": indicators,
+            "shown_indicators": len(indicators),
+            "note": "Se muestran las señales estructurales más relevantes para esta evaluación."
+        },
+        "meta": {
+            "engine_version": ENGINE_VERSION,
+            "site_type": site_type,
+            "content_hash": content_hash,
+            "analysis_key": analysis_key,
+            "premium_available": True,
+            "disclaimer": "SignalCheck no determina veracidad. Ningún sistema automatizado reemplaza el juicio humano."
+        }
     }
+
 
 # ==========================================================
 # ENDPOINT PREMIUM JSON
