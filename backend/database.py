@@ -4,8 +4,12 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL no está configurada")
+
 engine = create_engine(
     DATABASE_URL,
+    pool_pre_ping=True,     # evita conexiones muertas en Railway
     pool_size=10,
     max_overflow=20
 )

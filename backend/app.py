@@ -15,6 +15,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from database import engine
+from models import Base
+
+Base.metadata.create_all(bind=engine)
+
 # PDF
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table
 from reportlab.lib.styles import getSampleStyleSheet
@@ -37,6 +42,8 @@ PROMPT_VERSION = "none"  # Free mode no usa IA generativa
 # ==========================================================
 
 app = FastAPI(title="GE SignalCheck API v8 - Versioned Infrastructure Ready")
+
+Base.metadata.create_all(bind=engine)
 
 app.add_middleware(
     CORSMiddleware,
