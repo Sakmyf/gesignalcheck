@@ -110,15 +110,18 @@ async def verify(
     # VERSIONADO / TRAZABILIDAD
     # -------------------------
 
-    content_hash = generate_content_hash(data.text)
+       # -------------------------
+    # VERSIONADO / TRAZABILIDAD
+    # -------------------------
+
     content_hash = generate_content_hash(data.text)
 
-analysis_key = build_analysis_key(
-    url=data.url or "",
-    content_hash=content_hash,
-    engine_version=ENGINE_VERSION,
-    prompt_version=PROMPT_VERSION,
-)
+    analysis_key = build_analysis_key(
+        url=data.url or "",
+        content_hash=content_hash,
+        engine_version=ENGINE_VERSION,
+        prompt_version=PROMPT_VERSION,
+    )
 
     meta = {
         "engine_version": "5.0",
