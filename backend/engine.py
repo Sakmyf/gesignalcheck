@@ -1,5 +1,5 @@
-print("ENGINE RULE ENGINE 5.1 CALIBRADO ACTIVO")
-print("🔥 ENGINE.PY CALIBRADO ACTIVO")
+print("ENGINE RULE ENGINE 6.0 COGNITIVE PROTECTION ACTIVE")
+print("🔥 ENGINE.PY v6 ACTIVO")
 
 from backend.Analysis.emotions import check_emotions
 from backend.Analysis.credibility import check_credibility
@@ -8,13 +8,21 @@ from backend.Analysis.structural import check_structural
 from backend.Analysis.urgency import check_urgency
 from backend.Analysis.promises import check_promises
 from backend.Analysis.polarization import check_polarization
-from backend.Analysis.rules_types import RuleResult
 from urllib.parse import urlparse
 
 
-# Techo teórico separado
+# ===============================
+# Configuración estratégica
+# ===============================
+
 MAX_QUALITY_SCORE = 4.0
-MAX_RISK_SCORE = 6.0
+MAX_RISK_SCORE = 8.0  # Mayor techo para riesgo
+
+# Multiplicadores cognitivos
+EMOTION_WEIGHT = 1.3
+POLARIZATION_WEIGHT = 1.4
+URGENCY_WEIGHT = 1.2
+PROMISE_WEIGHT = 1.2
 
 
 def detect_site_type(url: str) -> str:
@@ -42,7 +50,7 @@ def analyze_context(text: str, url: str = ""):
     site_type = detect_site_type(url)
 
     # ===============================
-    # Ejecutamos módulos
+    # Ejecutar módulos
     # ===============================
 
     emotions = check_emotions(text)
@@ -54,7 +62,7 @@ def analyze_context(text: str, url: str = ""):
     polarization = check_polarization(text)
 
     # ===============================
-    # QUALITY (suma positiva)
+    # QUALITY (positivos)
     # ===============================
 
     quality_points = 0.0
@@ -62,15 +70,16 @@ def analyze_context(text: str, url: str = ""):
     quality_points += max(structural.points, 0)
 
     # ===============================
-    # RISK (magnitud de negativos)
+    # RISK (negativos ponderados)
     # ===============================
 
     risk_points = 0.0
-    risk_points += abs(min(emotions.points, 0))
+
+    risk_points += abs(min(emotions.points * EMOTION_WEIGHT, 0))
+    risk_points += abs(min(polarization.points * POLARIZATION_WEIGHT, 0))
+    risk_points += abs(min(urgency.points * URGENCY_WEIGHT, 0))
+    risk_points += abs(min(promises.points * PROMISE_WEIGHT, 0))
     risk_points += abs(min(misinformation.points, 0))
-    risk_points += abs(min(urgency.points, 0))
-    risk_points += abs(min(promises.points, 0))
-    risk_points += abs(min(polarization.points, 0))
 
     # ===============================
     # Ajuste por tipo de sitio
@@ -82,32 +91,26 @@ def analyze_context(text: str, url: str = ""):
         risk_points *= 0.9
     elif site_type == "social":
         risk_points *= 1.15
-    elif site_type == "blog":
-        risk_points *= 1.05
 
     # ===============================
-    # Normalización calibrada
+    # Normalización
     # ===============================
 
-    quality_ratio = quality_points / MAX_QUALITY_SCORE if MAX_QUALITY_SCORE > 0 else 0
-    risk_ratio = risk_points / MAX_RISK_SCORE if MAX_RISK_SCORE > 0 else 0
+    quality_score = quality_points / MAX_QUALITY_SCORE
+    quality_score = max(min(quality_score, 1.0), 0.0)
 
-    quality_ratio = max(min(quality_ratio, 1.0), 0.0)
-    risk_ratio = max(min(risk_ratio, 1.0), 0.0)
-
-    # Curvas no lineales suaves
-    risk_score = risk_ratio ** 1.35
-    quality_score = quality_ratio ** 1.1
+    risk_score = risk_points / MAX_RISK_SCORE
+    risk_score = max(min(risk_score, 1.0), 0.0)
 
     # ===============================
-    # Score global (riesgo pesa más)
+    # Score Global
+    # Riesgo domina sobre calidad
     # ===============================
 
     global_score = (risk_score * 0.75) + ((1 - quality_score) * 0.25)
-    global_score = max(min(global_score, 1.0), 0.0)
 
     # ===============================
-    # Decisión visual FREE
+    # Decisión visual
     # ===============================
 
     if global_score < 0.25:
@@ -118,7 +121,7 @@ def analyze_context(text: str, url: str = ""):
         label = "requiere lectura crítica"
     else:
         status = "red"
-        label = "información cuestionable"
+        label = "presión narrativa significativa"
 
     # ===============================
     # Recolección de señales
