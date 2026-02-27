@@ -10,7 +10,9 @@ import re
 import uuid
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, Request, HTTPException, Header
+from fastapi import FastAPI, Request, HTTPException, Header, Depends
+from sqlalchemy.orm import Session
+from backend.database import engine, get_db
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
