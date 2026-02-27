@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 # ===============================
 
 MAX_QUALITY_SCORE = 4.0
-MAX_RISK_SCORE = 8.0  # Mayor techo para riesgo
+MAX_RISK_SCORE = 8.0  # Mantengo tu valor original
 
 # Multiplicadores cognitivos
 EMOTION_WEIGHT = 1.6
@@ -82,22 +82,22 @@ def analyze_context(text: str, url: str = ""):
     risk_points += abs(min(misinformation.points, 0))
 
     # ===============================
-# Bonus por manipulación combinada
-# ===============================
+    # Bonus por manipulación combinada
+    # ===============================
 
-strong_signals = 0
+    strong_signals = 0
 
-if emotions.points < -0.7:
-    strong_signals += 1
+    if emotions.points < -0.7:
+        strong_signals += 1
 
-if polarization.points < -0.6:
-    strong_signals += 1
+    if polarization.points < -0.6:
+        strong_signals += 1
 
-if urgency.points < -0.5:
-    strong_signals += 1
+    if urgency.points < -0.5:
+        strong_signals += 1
 
-if strong_signals >= 2:
-    risk_points += 1.2
+    if strong_signals >= 2:
+        risk_points += 1.2
 
     # ===============================
     # Ajuste por tipo de sitio
@@ -122,7 +122,6 @@ if strong_signals >= 2:
 
     # ===============================
     # Score Global
-    # Riesgo domina sobre calidad
     # ===============================
 
     global_score = (risk_score * 0.75) + ((1 - quality_score) * 0.25)
