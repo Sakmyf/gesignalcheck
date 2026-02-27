@@ -166,7 +166,7 @@ async def verify(
     return {
         "analysis": {
             "level": level,
-            "summary": "requiere lectura crítica",
+            "summary": result["label"],
             "indicators": indicators,
             "shown_indicators": len(indicators),
             "note": "Se muestran las señales estructurales más relevantes para esta evaluación."

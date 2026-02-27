@@ -1,5 +1,5 @@
-print("ENGINE RULE ENGINE 5.0 ACTIVO")
-print("🔥 ENGINE.PY ACTIVO")
+print("ENGINE RULE ENGINE 5.1 CALIBRADO ACTIVO")
+print("🔥 ENGINE.PY CALIBRADO ACTIVO")
 
 from backend.Analysis.emotions import check_emotions
 from backend.Analysis.credibility import check_credibility
@@ -81,24 +81,30 @@ def analyze_context(text: str, url: str = ""):
     elif site_type == "media":
         risk_points *= 0.9
     elif site_type == "social":
-        risk_points *= 1.1
+        risk_points *= 1.15
+    elif site_type == "blog":
+        risk_points *= 1.05
 
     # ===============================
-    # Normalización
+    # Normalización calibrada
     # ===============================
 
-    quality_score = quality_points / MAX_QUALITY_SCORE
-    quality_score = max(min(quality_score, 1.0), 0.0)
+    quality_ratio = quality_points / MAX_QUALITY_SCORE if MAX_QUALITY_SCORE > 0 else 0
+    risk_ratio = risk_points / MAX_RISK_SCORE if MAX_RISK_SCORE > 0 else 0
 
-    risk_score = risk_points / MAX_RISK_SCORE
-    risk_score = max(min(risk_score, 1.0), 0.0)
+    quality_ratio = max(min(quality_ratio, 1.0), 0.0)
+    risk_ratio = max(min(risk_ratio, 1.0), 0.0)
+
+    # Curvas no lineales suaves
+    risk_score = risk_ratio ** 1.35
+    quality_score = quality_ratio ** 1.1
 
     # ===============================
-    # Score global (para FREE)
+    # Score global (riesgo pesa más)
     # ===============================
 
-    # Riesgo pesa más que calidad
-    global_score = (risk_score * 0.6) + ((1 - quality_score) * 0.4)
+    global_score = (risk_score * 0.75) + ((1 - quality_score) * 0.25)
+    global_score = max(min(global_score, 1.0), 0.0)
 
     # ===============================
     # Decisión visual FREE
