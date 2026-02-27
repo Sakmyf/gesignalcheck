@@ -19,10 +19,10 @@ MAX_QUALITY_SCORE = 4.0
 MAX_RISK_SCORE = 8.0  # Mayor techo para riesgo
 
 # Multiplicadores cognitivos
-EMOTION_WEIGHT = 1.3
-POLARIZATION_WEIGHT = 1.4
-URGENCY_WEIGHT = 1.2
-PROMISE_WEIGHT = 1.2
+EMOTION_WEIGHT = 1.6
+POLARIZATION_WEIGHT = 1.7
+URGENCY_WEIGHT = 1.4
+PROMISE_WEIGHT = 1.4
 
 
 def detect_site_type(url: str) -> str:
@@ -80,6 +80,24 @@ def analyze_context(text: str, url: str = ""):
     risk_points += abs(min(urgency.points * URGENCY_WEIGHT, 0))
     risk_points += abs(min(promises.points * PROMISE_WEIGHT, 0))
     risk_points += abs(min(misinformation.points, 0))
+
+    # ===============================
+# Bonus por manipulación combinada
+# ===============================
+
+strong_signals = 0
+
+if emotions.points < -0.7:
+    strong_signals += 1
+
+if polarization.points < -0.6:
+    strong_signals += 1
+
+if urgency.points < -0.5:
+    strong_signals += 1
+
+if strong_signals >= 2:
+    risk_points += 1.2
 
     # ===============================
     # Ajuste por tipo de sitio
