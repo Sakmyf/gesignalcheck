@@ -1,5 +1,9 @@
 print("APP FILE ACTUAL 9.9")
 
+# ==========================================================
+# CORE IMPORTS
+# ==========================================================
+
 from backend.engine import analyze_context, interpret_score
 from backend.utils.content_versioning import (
     generate_content_hash,
@@ -10,26 +14,30 @@ import re
 import uuid
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, Request, HTTPException, Header, Depends
-from sqlalchemy.orm import Session
-from backend.database import engine, get_db
+from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from backend.database import engine
-from backend.models import Base
+from backend.database import engine, get_db
+from backend.models import Base, Extension
+
+# ==========================================================
+# DB INIT
+# ==========================================================
 
 Base.metadata.create_all(bind=engine)
 
-# PDF
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table
+# ==========================================================
+# PDF IMPORTS
+# ==========================================================
+
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 from reportlab.lib.units import inch
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import TableStyle
-
 
 # ==========================================================
 # VERSION CONTROL
@@ -38,14 +46,11 @@ from reportlab.platypus import TableStyle
 ENGINE_VERSION = "v8.5"
 PROMPT_VERSION = "none"  # Free mode no usa IA generativa
 
-
 # ==========================================================
 # FASTAPI INIT
 # ==========================================================
 
 app = FastAPI(title="GE SignalCheck API v8 - Versioned Infrastructure Ready")
-
-Base.metadata.create_all(bind=engine)
 
 app.add_middleware(
     CORSMiddleware,
@@ -56,21 +61,12 @@ app.add_middleware(
 )
 
 # ==========================================================
-# EXTENSIONES AUTORIZADAS
-# ==========================================================
-
-ALLOWED_EXTENSIONS = [
-    "fijnjbaacmpnhaaconoafbmnholbmaig"
-]
-
-# ==========================================================
 # MODELO DE ENTRADA
 # ==========================================================
 
 class VerifyRequest(BaseModel):
     url: str
     text: str
-
 
 # ==========================================================
 # ROOT
@@ -79,7 +75,6 @@ class VerifyRequest(BaseModel):
 @app.get("/")
 def root():
     return {"status": "GE SignalCheck API online"}
-
 
 # ==========================================================
 # ENDPOINT PUBLICO
@@ -212,7 +207,6 @@ async def verify_premium(
             ]
         }
     }
-
 
 # ==========================================================
 # ENDPOINT PDF PREMIUM
