@@ -86,20 +86,37 @@ def root():
 @app.post("/v3/verify")
 async def verify(
     data: VerifyRequest,
-    x_extension_id: str = Header(None)
+    x_extension_id: str = Header(None),
+    db: Session = Depends(get_db)
 ):
 
     # -------------------------
-    # VALIDACIONES DE SEGURIDAD
+    # VALIDACION EXTENSION (DB REAL)
     # -------------------------
 
     if not x_extension_id:
         raise HTTPException(status_code=401, detail="Extensión no identificada")
 
-    if x_extension_id.strip() not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=403, detail="Extensión no autorizada")
+    extension = db.query(Extension).filter(
+        Extension.extension_id == x_extension_id.strip()
+    ).first()
 
-    if len(data.text.strip()) < 30:
+    if not extension:
+        raise HTTPException(status_code=401, detail="Extensión no registrada")
+
+    if not extension.is_active:
+        raise HTTPException(status_code=403, detail="Extensión desactivada")
+
+    # Si analyses_limit es 0 => ilimitado
+    if extension.analyses_limit > 0 and \
+       extension.analyses_used >= extension.analyses_limit:
+        raise HTTPException(status_code=403, detail="Límite de uso alcanzado")
+
+    # -------------------------
+    # VALIDACION TEXTO
+    # -------------------------
+
+    if not data.text or len(data.text.strip()) < 30:
         raise HTTPException(status_code=400, detail="Texto insuficiente")
 
     # -------------------------
@@ -139,6 +156,13 @@ async def verify(
     ]
 
     # -------------------------
+    # INCREMENTAR USO
+    # -------------------------
+
+    extension.analyses_used += 1
+    db.commit()
+
+    # -------------------------
     # RESPUESTA FINAL
     # -------------------------
 
@@ -159,7 +183,6 @@ async def verify(
             "disclaimer": "SignalCheck no determina veracidad. Ningún sistema automatizado reemplaza el juicio humano."
         }
     }
-
 
 # ==========================================================
 # ENDPOINT PREMIUM JSON
