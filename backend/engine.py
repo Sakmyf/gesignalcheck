@@ -12,14 +12,14 @@ from backend.Analysis.scientific_claims import check_scientific_claims
 from backend.Analysis.hypothetical import check_hypothetical
 from urllib.parse import urlparse
 
+
 # ===============================
 # Configuración estratégica
 # ===============================
 
 MAX_QUALITY_SCORE = 4.0
-MAX_RISK_SCORE = 8.0  # Mantengo tu valor original
+MAX_RISK_SCORE = 8.0
 
-# Multiplicadores cognitivos
 EMOTION_WEIGHT = 1.6
 POLARIZATION_WEIGHT = 1.7
 URGENCY_WEIGHT = 1.4
@@ -61,9 +61,11 @@ def analyze_context(text: str, url: str = ""):
     urgency = check_urgency(text)
     promises = check_promises(text)
     polarization = check_polarization(text)
+    scientific = check_scientific_claims(text)
+    hypothetical = check_hypothetical(text)
 
     # ===============================
-    # QUALITY (positivos)
+    # QUALITY
     # ===============================
 
     quality_points = 0.0
@@ -71,7 +73,7 @@ def analyze_context(text: str, url: str = ""):
     quality_points += max(structural.points, 0)
 
     # ===============================
-    # RISK (negativos ponderados)
+    # RISK
     # ===============================
 
     risk_points = 0.0
@@ -81,9 +83,11 @@ def analyze_context(text: str, url: str = ""):
     risk_points += abs(min(urgency.points * URGENCY_WEIGHT, 0))
     risk_points += abs(min(promises.points * PROMISE_WEIGHT, 0))
     risk_points += abs(min(misinformation.points, 0))
+    risk_points += abs(min(scientific.points, 0))
+    risk_points += abs(min(hypothetical.points, 0))
 
     # ===============================
-    # Bonus por manipulación combinada
+    # Bonus manipulación combinada
     # ===============================
 
     strong_signals = 0
@@ -115,15 +119,8 @@ def analyze_context(text: str, url: str = ""):
     # Normalización
     # ===============================
 
-    quality_score = quality_points / MAX_QUALITY_SCORE
-    quality_score = max(min(quality_score, 1.0), 0.0)
-
-    risk_score = risk_points / MAX_RISK_SCORE
-    risk_score = max(min(risk_score, 1.0), 0.0)
-
-    # ===============================
-    # Score Global
-    # ===============================
+    quality_score = max(min(quality_points / MAX_QUALITY_SCORE, 1.0), 0.0)
+    risk_score = max(min(risk_points / MAX_RISK_SCORE, 1.0), 0.0)
 
     global_score = (risk_score * 0.75) + ((1 - quality_score) * 0.25)
 
@@ -146,27 +143,27 @@ def analyze_context(text: str, url: str = ""):
     # ===============================
 
     all_reasons = (
-    emotions.reasons +
-    credibility.reasons +
-    misinformation.reasons +
-    structural.reasons +
-    urgency.reasons +
-    promises.reasons +
-    polarization.reasons +
-    scientific.reasons +
-    hypothetical.reasons
+        emotions.reasons +
+        credibility.reasons +
+        misinformation.reasons +
+        structural.reasons +
+        urgency.reasons +
+        promises.reasons +
+        polarization.reasons +
+        scientific.reasons +
+        hypothetical.reasons
     )
 
-all_evidence = (
-    emotions.evidence +
-    credibility.evidence +
-    misinformation.evidence +
-    structural.evidence +
-    urgency.evidence +
-    promises.evidence +
-    polarization.evidence +
-    scientific.evidence +
-    hypothetical.evidence
+    all_evidence = (
+        emotions.evidence +
+        credibility.evidence +
+        misinformation.evidence +
+        structural.evidence +
+        urgency.evidence +
+        promises.evidence +
+        polarization.evidence +
+        scientific.evidence +
+        hypothetical.evidence
     )
 
     return {
