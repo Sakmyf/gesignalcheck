@@ -8,8 +8,9 @@ from backend.Analysis.structural import check_structural
 from backend.Analysis.urgency import check_urgency
 from backend.Analysis.promises import check_promises
 from backend.Analysis.polarization import check_polarization
+from backend.Analysis.scientific_claims import check_scientific_claims
+from backend.Analysis.hypothetical import check_hypothetical
 from urllib.parse import urlparse
-
 
 # ===============================
 # Configuración estratégica
@@ -152,6 +153,8 @@ def analyze_context(text: str, url: str = ""):
         urgency.reasons +
         promises.reasons +
         polarization.reasons
+        scientific.reasons +
+        hypothetical.reasons
     )
 
     all_evidence = (
@@ -162,6 +165,8 @@ def analyze_context(text: str, url: str = ""):
         urgency.evidence +
         promises.evidence +
         polarization.evidence
+        scientific.reasons +
+        hypothetical.reasons
     )
 
     return {
