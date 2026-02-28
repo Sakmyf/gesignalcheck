@@ -155,7 +155,7 @@ def analyze_context(text: str, url: str = ""):
     polarization.reasons +
     scientific.reasons +
     hypothetical.reasons
-)
+    )
 
 all_evidence = (
     emotions.evidence +
@@ -167,8 +167,6 @@ all_evidence = (
     polarization.evidence +
     scientific.evidence +
     hypothetical.evidence
-)
-
     )
 
     return {
