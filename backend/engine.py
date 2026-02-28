@@ -168,6 +168,7 @@ all_evidence = (
     scientific.evidence +
     hypothetical.evidence
 )
+
     )
 
     return {
