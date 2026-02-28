@@ -146,27 +146,28 @@ def analyze_context(text: str, url: str = ""):
     # ===============================
 
     all_reasons = (
-        emotions.reasons +
-        credibility.reasons +
-        misinformation.reasons +
-        structural.reasons +
-        urgency.reasons +
-        promises.reasons +
-        polarization.reasons
-        scientific.reasons +
-        hypothetical.reasons
-    )
+    emotions.reasons +
+    credibility.reasons +
+    misinformation.reasons +
+    structural.reasons +
+    urgency.reasons +
+    promises.reasons +
+    polarization.reasons +
+    scientific.reasons +
+    hypothetical.reasons
+)
 
-    all_evidence = (
-        emotions.evidence +
-        credibility.evidence +
-        misinformation.evidence +
-        structural.evidence +
-        urgency.evidence +
-        promises.evidence +
-        polarization.evidence
-        scientific.reasons +
-        hypothetical.reasons
+all_evidence = (
+    emotions.evidence +
+    credibility.evidence +
+    misinformation.evidence +
+    structural.evidence +
+    urgency.evidence +
+    promises.evidence +
+    polarization.evidence +
+    scientific.evidence +
+    hypothetical.evidence
+)
     )
 
     return {
