@@ -4,6 +4,7 @@ print("APP FILE ACTUAL 9.9")
 # CORE IMPORTS
 # ==========================================================
 
+from backend.models import AnalysisLog
 from backend.engine import analyze_context, interpret_score
 from backend.utils.content_versioning import (
     generate_content_hash,
@@ -142,6 +143,24 @@ async def verify(
 
     result = analyze_context(data.text, data.url or "")
     status_color, level = interpret_score(result["score"])
+
+    # -------------------------
+    # GUARDAR LOG DE ANALISIS
+    # -------------------------
+
+    analysis_log = AnalysisLog(
+        trust_score=result.get("quality_score", 0),
+        rhetorical_score=0,  # si no lo estás usando todavía
+        narrative_score=0,   # si no lo estás usando todavía
+        absence_score=0,     # si no lo estás usando todavía
+        risk_index=result.get("risk_score", 0),
+        level=level,
+        premium_requested=False,
+        engine_version=ENGINE_VERSION
+)
+
+db.add(analysis_log)
+db.commit()
 
     indicators = [
         {

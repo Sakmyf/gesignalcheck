@@ -258,6 +258,8 @@ No es:
 
 \- Detector automático de “verdad”
 
+\- Sistema de certificación científica
+
 
 
 Es:

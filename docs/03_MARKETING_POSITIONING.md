@@ -249,4 +249,22 @@ Ningún sistema automatizado reemplaza el criterio personal.
 SignalCheck es una herramienta de apoyo.
 
 
+---
+
+
+\## Marco científico
+
+
+
+
+SignalCheck no determina la verdad científica de una afirmación.
+
+Identifica señales estructurales de:
+
+- evidencia incompleta
+- ausencia de fuentes visibles
+- promesas extraordinarias sin respaldo claro
+
+En temas científicos en evolución, prioriza la clasificación “en debate” antes que dictámenes categóricos.
+
 

@@ -102,3 +102,23 @@ No reemplaza procesos de investigación profesional.
 
 
 
+---
+
+
+
+/## 5. Marco sobre ciencia y debate
+
+GE SignalCheck reconoce que el conocimiento científico evoluciona.
+
+La ausencia de consenso no implica falsedad automática.
+
+En contenidos científicos o médicos, el sistema puede clasificar como:
+
+- en_debate
+- especulativo
+
+cuando detecta evidencia incompleta o controversia activa.
+
+GE SignalCheck no sustituye el proceso científico ni certifica verdades médicas.
+
+
