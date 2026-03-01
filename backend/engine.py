@@ -1,231 +1,184 @@
-print("APP FILE ACTUAL 10.0")
+print("ENGINE RULE ENGINE 6.2 COGNITIVE PROTECTION ACTIVE")
+print("🔥 ENGINE.PY v6.2 ACTIVO")
 
-# ==========================================================
-# CORE IMPORTS
-# ==========================================================
+ENGINE_VERSION = "6.2.0"
+ENGINE_MODE = "hybrid_narrative_scientific"
 
-from backend.models import Base, Extension, AnalysisLog
-from backend.engine import analyze_context, interpret_score, ENGINE_VERSION
-from backend.utils.content_versioning import (
-    generate_content_hash,
-    build_analysis_key,
-)
-
+from backend.Analysis.emotions import check_emotions
+from backend.Analysis.credibility import check_credibility
+from backend.Analysis.misinformation import check_misinformation
+from backend.Analysis.structural import check_structural
+from backend.Analysis.urgency import check_urgency
+from backend.Analysis.promises import check_promises
+from backend.Analysis.polarization import check_polarization
+from backend.Analysis.scientific_claims import check_scientific_claims
+from backend.Analysis.hypothetical import check_hypothetical
 from urllib.parse import urlparse
-from fastapi import FastAPI, HTTPException, Header, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
-from backend.database import engine, get_db
+# ===============================
+# Configuración estratégica
+# ===============================
 
-# ==========================================================
-# DB INIT
-# ==========================================================
+MAX_QUALITY_SCORE = 4.0
+MAX_RISK_SCORE = 8.0
 
-Base.metadata.create_all(bind=engine)
+EMOTION_WEIGHT = 1.6
+POLARIZATION_WEIGHT = 1.7
+URGENCY_WEIGHT = 1.4
+PROMISE_WEIGHT = 1.4
 
-# ==========================================================
-# VERSION CONTROL
-# ==========================================================
 
-PROMPT_VERSION = "none"  # Free mode no usa IA generativa
+def detect_site_type(url: str) -> str:
+    if not url:
+        return "unknown"
 
-# ==========================================================
-# FASTAPI INIT
-# ==========================================================
+    domain = urlparse(url).netloc.lower()
 
-app = FastAPI(title="GE SignalCheck API v10 - Versioned & Logged")
+    if any(k in domain for k in [".gob.", ".gov.", ".edu."]):
+        return "institutional"
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    if any(k in domain for k in ["clarin", "bbc", "cnn", "reuters"]):
+        return "media"
 
-# ==========================================================
-# MODELO DE ENTRADA
-# ==========================================================
+    if any(k in domain for k in ["facebook", "instagram", "tiktok", "x.com"]):
+        return "social"
 
-class VerifyRequest(BaseModel):
-    url: str
-    text: str
+    return "blog"
 
-# ==========================================================
-# ROOT
-# ==========================================================
 
-@app.get("/")
-def root():
-    return {"status": "GE SignalCheck API online"}
+def analyze_context(text: str, url: str = ""):
 
-# ==========================================================
-# ENDPOINT PUBLICO
-# ==========================================================
+    site_type = detect_site_type(url)
 
-@app.post("/v3/verify")
-async def verify(
-    data: VerifyRequest,
-    x_extension_id: str = Header(None),
-    db: Session = Depends(get_db)
-):
+    emotions = check_emotions(text)
+    credibility = check_credibility(text)
+    misinformation = check_misinformation(text)
+    structural = check_structural(text)
+    urgency = check_urgency(text)
+    promises = check_promises(text)
+    polarization = check_polarization(text)
+    scientific = check_scientific_claims(text)
+    hypothetical = check_hypothetical(text)
 
-    # -------------------------
-    # VALIDACION EXTENSION
-    # -------------------------
+    # ===============================
+    # QUALITY
+    # ===============================
 
-    if not x_extension_id:
-        raise HTTPException(status_code=401, detail="Extensión no identificada")
-
-    extension = db.query(Extension).filter(
-        Extension.extension_id == x_extension_id.strip()
-    ).first()
-
-    if not extension:
-        raise HTTPException(status_code=401, detail="Extensión no registrada")
-
-    if not extension.is_active:
-        raise HTTPException(status_code=403, detail="Extensión desactivada")
-
-    if extension.analyses_limit > 0 and \
-       extension.analyses_used >= extension.analyses_limit:
-        raise HTTPException(status_code=403, detail="Límite de uso alcanzado")
-
-    # -------------------------
-    # VALIDACION TEXTO
-    # -------------------------
-
-    if not data.text or len(data.text.strip()) < 30:
-        raise HTTPException(status_code=400, detail="Texto insuficiente")
-
-    # -------------------------
-    # SITE TYPE
-    # -------------------------
-
-    parsed = urlparse(data.url or "")
-    site_type = parsed.netloc if parsed.netloc else "unknown"
-
-    # -------------------------
-    # VERSIONADO / HASH
-    # -------------------------
-
-    content_hash = generate_content_hash(data.text)
-
-    analysis_key = build_analysis_key(
-        url=data.url or "",
-        content_hash=content_hash,
-        engine_version=ENGINE_VERSION,
-        prompt_version=PROMPT_VERSION,
+    quality_points = (
+        max(credibility.points, 0) +
+        max(structural.points, 0)
     )
 
-    # -------------------------
-    # ANALISIS
-    # -------------------------
+    # ===============================
+    # RISK
+    # ===============================
 
-    result = analyze_context(data.text, data.url or "")
-    status_color, level = interpret_score(result["score"])
+    risk_points = 0.0
 
-    # -------------------------
-    # GUARDAR LOG
-    # -------------------------
+    risk_points += abs(min(emotions.points * EMOTION_WEIGHT, 0))
+    risk_points += abs(min(polarization.points * POLARIZATION_WEIGHT, 0))
+    risk_points += abs(min(urgency.points * URGENCY_WEIGHT, 0))
+    risk_points += abs(min(promises.points * PROMISE_WEIGHT, 0))
+    risk_points += abs(min(misinformation.points, 0))
+    risk_points += abs(min(scientific.points, 0))
+    risk_points += abs(min(hypothetical.points, 0))
 
-    analysis_log = AnalysisLog(
-        trust_score=result.get("quality_score", 0),
-        rhetorical_score=0,
-        narrative_score=0,
-        absence_score=0,
-        risk_index=result.get("risk_score", 0),
-        level=level,
-        premium_requested=False,
-        engine_version=ENGINE_VERSION,
-        analysis_key=analysis_key
+    # ===============================
+    # Bonus manipulación combinada
+    # ===============================
+
+    strong_signals = 0
+
+    if emotions.points < -0.7:
+        strong_signals += 1
+    if polarization.points < -0.6:
+        strong_signals += 1
+    if urgency.points < -0.5:
+        strong_signals += 1
+
+    if strong_signals >= 2:
+        risk_points += 1.2
+
+    # ===============================
+    # Ajuste por tipo de sitio
+    # ===============================
+
+    if site_type == "institutional":
+        risk_points *= 0.7
+    elif site_type == "media":
+        risk_points *= 0.9
+    elif site_type == "social":
+        risk_points *= 1.15
+
+    # ===============================
+    # Normalización
+    # ===============================
+
+    quality_score = max(min(quality_points / MAX_QUALITY_SCORE, 1.0), 0.0)
+    risk_score = max(min(risk_points / MAX_RISK_SCORE, 1.0), 0.0)
+
+    global_score = (risk_score * 0.75) + ((1 - quality_score) * 0.25)
+
+    # ===============================
+    # Decisión visual
+    # ===============================
+
+    if global_score < 0.25:
+        status = "green"
+        label = "contenido informativo"
+    elif global_score < 0.55:
+        status = "yellow"
+        label = "requiere lectura crítica"
+    else:
+        status = "red"
+        label = "presión narrativa significativa"
+
+    # ===============================
+    # Recolección de señales
+    # ===============================
+
+    all_reasons = (
+        emotions.reasons +
+        credibility.reasons +
+        misinformation.reasons +
+        structural.reasons +
+        urgency.reasons +
+        promises.reasons +
+        polarization.reasons +
+        scientific.reasons +
+        hypothetical.reasons
     )
 
-    db.add(analysis_log)
-
-    # -------------------------
-    # INCREMENTAR USO
-    # -------------------------
-
-    extension.analyses_used += 1
-
-    db.commit()
-
-    # -------------------------
-    # INDICADORES
-    # -------------------------
-
-    indicators = [
-        {
-            "title": s,
-            "explanation": "Señal estructural detectada durante el análisis contextual.",
-            "orientation": "alerta" if status_color != "green" else "neutro"
-        }
-        for s in result.get("signals", [])[:5]
-    ]
-
-    # -------------------------
-    # RESPUESTA
-    # -------------------------
+    all_evidence = (
+        emotions.evidence +
+        credibility.evidence +
+        misinformation.evidence +
+        structural.evidence +
+        urgency.evidence +
+        promises.evidence +
+        polarization.evidence +
+        scientific.evidence +
+        hypothetical.evidence
+    )
 
     return {
-        "analysis": {
-            "level": level,
-            "summary": result["label"],
-            "indicators": indicators,
-            "shown_indicators": len(indicators),
-            "note": "Se muestran las señales estructurales más relevantes para esta evaluación."
-        },
-        "meta": {
-            "engine_version": ENGINE_VERSION,
-            "site_type": site_type,
-            "content_hash": content_hash,
-            "analysis_key": analysis_key,
-            "premium_available": True,
-            "disclaimer": "SignalCheck no determina veracidad. Ningún sistema automatizado reemplaza el juicio humano."
-        }
+        "engine_version": ENGINE_VERSION,
+        "engine_mode": ENGINE_MODE,
+        "status": status,
+        "label": label,
+        "score": round(global_score, 2),
+        "quality_score": round(quality_score, 2),
+        "risk_score": round(risk_score, 2),
+        "site_type": site_type,
+        "signals": all_evidence,
+        "reasons": all_reasons,
     }
 
-# ==========================================================
-# ENDPOINT PREMIUM JSON
-# ==========================================================
 
-@app.post("/v3/verify/premium")
-async def verify_premium(
-    data: VerifyRequest,
-    x_premium_token: str = Header(None)
-):
-
-    if not x_premium_token:
-        raise HTTPException(status_code=401, detail="Acceso premium requerido")
-
-    return {
-        "analysis": {
-            "level": "bajo",
-            "structural_index": 0.25,
-            "breakdown": {},
-            "all_detected_signals": ["estructura clara"],
-            "critical_questions": [
-                "¿Las afirmaciones principales incluyen respaldo verificable?",
-                "¿Existen fuentes alternativas que aporten contexto adicional?",
-                "¿El lenguaje prioriza impacto emocional sobre evidencia estructural?"
-            ]
-        }
-    }
-
-# ==========================================================
-# ENDPOINT PDF PREMIUM
-# ==========================================================
-
-@app.post("/v3/report")
-async def generate_report(
-    data: VerifyRequest,
-    x_premium_token: str = Header(None)
-):
-
-    if not x_premium_token:
-        raise HTTPException(status_code=401, detail="Acceso premium requerido")
-
-    return {"status": "PDF endpoint activo"}
+def interpret_score(score: float):
+    if score < 0.25:
+        return "green", "bajo"
+    elif score < 0.55:
+        return "yellow", "medio"
+    else:
+        return "red", "alto"
