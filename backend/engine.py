@@ -1,5 +1,5 @@
 print("ENGINE RULE ENGINE 6.2 COGNITIVE PROTECTION ACTIVE")
-print("🔥 ENGINE.PY v6.2 ACTIVO")
+print("🔥 ENGINE.PY 6.2 ACTIVO")
 
 ENGINE_VERSION = "6.2.0"
 ENGINE_MODE = "hybrid_narrative_scientific"

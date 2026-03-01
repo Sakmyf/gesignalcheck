@@ -149,16 +149,24 @@ async def verify(
     # -------------------------
 
     analysis_log = AnalysisLog(
-        trust_score=result.get("quality_score", 0),
-        rhetorical_score=0,
-        narrative_score=0,
-        absence_score=0,
-        risk_index=result.get("risk_score", 0),
-        level=level,
-        premium_requested=False,
-        engine_version=ENGINE_VERSION,
-        analysis_key=analysis_key
-    )
+    trust_score=result.get("quality_score", 0),
+    rhetorical_score=0,
+    narrative_score=0,
+    absence_score=0,
+
+    # Guardamos el score global real (el que ve el usuario)
+    risk_index=result.get("score", 0),
+
+    # Guardamos el status real del engine
+    level=result.get("status"),
+
+    premium_requested=False,
+
+    # Guardamos la versión que realmente devolvió el engine
+    engine_version=result.get("engine_version"),
+
+    analysis_key=analysis_key
+)
 
     db.add(analysis_log)
 
