@@ -150,17 +150,29 @@ async def verify(
 
     analysis_log = AnalysisLog(
         trust_score=result.get("quality_score", 0),
-        rhetorical_score=0,  # si no lo estás usando todavía
-        narrative_score=0,   # si no lo estás usando todavía
-        absence_score=0,     # si no lo estás usando todavía
+        rhetorical_score=0,
+        narrative_score=0,
+        absence_score=0,
         risk_index=result.get("risk_score", 0),
         level=level,
         premium_requested=False,
-        engine_version=ENGINE_VERSION
-)
+        engine_version=ENGINE_VERSION,
+        analysis_key=analysis_key
+    )
 
-db.add(analysis_log)
-db.commit()
+    db.add(analysis_log)
+
+    # -------------------------
+    # INCREMENTAR USO
+    # -------------------------
+
+    extension.analyses_used += 1
+
+    db.commit()
+
+    # -------------------------
+    # INDICADORES
+    # -------------------------
 
     indicators = [
         {
@@ -170,13 +182,6 @@ db.commit()
         }
         for s in result.get("signals", [])[:5]
     ]
-
-    # -------------------------
-    # INCREMENTAR USO
-    # -------------------------
-
-    extension.analyses_used += 1
-    db.commit()
 
     # -------------------------
     # RESPUESTA FINAL
