@@ -84,7 +84,7 @@ class AnalysisLog(Base):
     premium_requested = Column(Boolean, default=False)
 
     engine_version = Column(String(20))
-
+    analysis_key = Column(String(255), nullable=True, index=True)  
 
 # ============================
 # EXTENSIONES AUTORIZADAS
