@@ -1,3 +1,69 @@
+print("APP FILE ACTUAL 10.0")
+
+# ==========================================================
+# IMPORTS
+# ==========================================================
+
+from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from urllib.parse import urlparse
+
+from backend.database import engine, get_db
+from backend.models import Base, Extension, AnalysisLog
+from backend.engine import analyze_context, interpret_score
+from backend.utils.content_versioning import (
+    generate_content_hash,
+    build_analysis_key,
+)
+
+# ==========================================================
+# VERSION CONTROL
+# ==========================================================
+
+ENGINE_VERSION = "v8.5"
+
+# ==========================================================
+# FASTAPI INIT
+# ==========================================================
+
+app = FastAPI(title="GE SignalCheck API v8 - Stable Cache Version")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ==========================================================
+# DB INIT
+# ==========================================================
+
+Base.metadata.create_all(bind=engine)
+
+# ==========================================================
+# INPUT MODEL
+# ==========================================================
+
+class VerifyRequest(BaseModel):
+    url: str
+    text: str
+
+# ==========================================================
+# ROOT
+# ==========================================================
+
+@app.get("/")
+def root():
+    return {"status": "GE SignalCheck API online"}
+
+# ==========================================================
+# VERIFY ENDPOINT
+# ==========================================================
+
 @app.post("/v3/verify")
 async def verify(
     data: VerifyRequest,
@@ -6,7 +72,7 @@ async def verify(
 ):
 
     # -------------------------
-    # VALIDACION EXTENSION
+    # VALIDATE EXTENSION
     # -------------------------
 
     if not x_extension_id:
@@ -27,7 +93,7 @@ async def verify(
         raise HTTPException(status_code=403, detail="Límite de uso alcanzado")
 
     # -------------------------
-    # VALIDACION TEXTO
+    # VALIDATE TEXT
     # -------------------------
 
     if not data.text or len(data.text.strip()) < 30:
@@ -37,7 +103,7 @@ async def verify(
     url = data.url or ""
 
     # -------------------------
-    # VERSIONADO
+    # HASH + ANALYSIS KEY
     # -------------------------
 
     content_hash = generate_content_hash(text)
@@ -70,21 +136,21 @@ async def verify(
         }
 
     # -------------------------
-    # EJECUTAR ENGINE
+    # RUN ENGINE
     # -------------------------
 
     result = analyze_context(text, url)
     status_color, level = interpret_score(result.get("score", 0))
 
     # -------------------------
-    # DETERMINAR SITE TYPE
+    # DETERMINE SITE TYPE
     # -------------------------
 
     parsed = urlparse(url)
     site_type = parsed.netloc if parsed.netloc else "unknown"
 
     # -------------------------
-    # GUARDAR LOG
+    # SAVE LOG
     # -------------------------
 
     analysis_log = AnalysisLog(
@@ -102,15 +168,14 @@ async def verify(
     db.add(analysis_log)
 
     # -------------------------
-    # INCREMENTAR USO
+    # INCREMENT USAGE
     # -------------------------
 
     extension.analyses_used += 1
-
     db.commit()
 
     # -------------------------
-    # INDICADORES
+    # BUILD INDICATORS
     # -------------------------
 
     indicators = [
@@ -123,7 +188,7 @@ async def verify(
     ]
 
     # -------------------------
-    # RESPUESTA FINAL
+    # RESPONSE
     # -------------------------
 
     return {
@@ -139,7 +204,50 @@ async def verify(
             "site_type": site_type,
             "content_hash": content_hash,
             "analysis_key": analysis_key,
+            "cached": False,
             "premium_available": True,
             "disclaimer": "SignalCheck no determina veracidad. Ningún sistema automatizado reemplaza el juicio humano."
         }
     }
+
+# ==========================================================
+# PREMIUM JSON ENDPOINT
+# ==========================================================
+
+@app.post("/v3/verify/premium")
+async def verify_premium(
+    data: VerifyRequest,
+    x_premium_token: str = Header(None)
+):
+
+    if not x_premium_token:
+        raise HTTPException(status_code=401, detail="Acceso premium requerido")
+
+    return {
+        "analysis": {
+            "level": "bajo",
+            "structural_index": 0.25,
+            "breakdown": {},
+            "all_detected_signals": ["estructura clara"],
+            "critical_questions": [
+                "¿Las afirmaciones principales incluyen respaldo verificable?",
+                "¿Existen fuentes alternativas que aporten contexto adicional?",
+                "¿El lenguaje prioriza impacto emocional sobre evidencia estructural?"
+            ]
+        }
+    }
+
+# ==========================================================
+# REPORT ENDPOINT
+# ==========================================================
+
+@app.post("/v3/report")
+async def generate_report(
+    data: VerifyRequest,
+    x_premium_token: str = Header(None)
+):
+
+    if not x_premium_token:
+        raise HTTPException(status_code=401, detail="Acceso premium requerido")
+
+    return {"status": "PDF endpoint activo"}
