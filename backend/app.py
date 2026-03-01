@@ -1,4 +1,4 @@
-print("APP FILE ACTUAL 10.0")
+print("APP FILE ACTUAL 11.0")
 
 # ==========================================================
 # IMPORTS
@@ -23,12 +23,13 @@ from backend.utils.content_versioning import (
 # ==========================================================
 
 ENGINE_VERSION = "v8.5"
+PROMPT_VERSION = "none"
 
 # ==========================================================
 # FASTAPI INIT
 # ==========================================================
 
-app = FastAPI(title="GE SignalCheck API v8 - Stable Cache Version")
+app = FastAPI(title="GE SignalCheck API v8 - Stable")
 
 app.add_middleware(
     CORSMiddleware,
@@ -107,7 +108,13 @@ async def verify(
     # -------------------------
 
     content_hash = generate_content_hash(text)
-    analysis_key = build_analysis_key(content_hash, ENGINE_VERSION)
+
+    analysis_key = build_analysis_key(
+        url=url,
+        content_hash=content_hash,
+        engine_version=ENGINE_VERSION,
+        prompt_version=PROMPT_VERSION
+    )
 
     # -------------------------
     # CACHE CHECK
