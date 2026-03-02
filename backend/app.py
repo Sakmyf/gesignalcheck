@@ -160,19 +160,19 @@ async def verify(
     # SAVE LOG
     # -------------------------
 
-   analysis_log = AnalysisLog(
-    trust_score=result.get("quality_score", 0),
-    rhetorical_score=0,
-    narrative_score=0,
-    absence_score=0,
-    risk_index=result.get("score", 0),
-    level=level, 
-    premium_requested=False,
-    engine_version=ENGINE_VERSION,
-    analysis_key=analysis_key
-)
+    analysis_log = AnalysisLog(
+        trust_score=result.get("quality_score", 0),
+        rhetorical_score=0,
+        narrative_score=0,
+        absence_score=0,
+        risk_index=result.get("score", 0),
+        level=level,
+        premium_requested=False,
+        engine_version=ENGINE_VERSION,
+        analysis_key=analysis_key
+    )
 
-db.add(analysis_log)
+    db.add(analysis_log)
 
     # -------------------------
     # INCREMENT USAGE
