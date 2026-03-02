@@ -1,7 +1,7 @@
-print("ENGINE RULE ENGINE 6.2 COGNITIVE PROTECTION ACTIVE")
-print("🔥 ENGINE.PY 6.2 ACTIVO")
+print("ENGINE RULE ENGINE 6.2.1 COGNITIVE PROTECTION ACTIVE")
+print("🔥 ENGINE.PY 6.2.1 ACTIVO")
 
-ENGINE_VERSION = "6.2.0"
+ENGINE_VERSION = "6.2.1"
 ENGINE_MODE = "hybrid_narrative_scientific"
 
 from backend.Analysis.emotions import check_emotions
