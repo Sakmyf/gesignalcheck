@@ -12,16 +12,35 @@ document.addEventListener("DOMContentLoaded", () => {
   const labelBadge = document.getElementById("labelBadge");
   const errorDiv = document.getElementById("error");
 
-  // ✅ URL CORREGIDA: SIN ESPACIOS AL FINAL
-  const API_URL = "https://gesignalcheck-production-8e78.up.railway.app/v3/verify";
+  const scoreContainer = scoreValue.parentElement; // 👈 importante
 
   // ======================================================
-  // MAIN CLICK HANDLER
+  // RESET UI
+  // ======================================================
+
+  function resetUI() {
+    errorDiv.style.display = "none";
+    errorDiv.textContent = "";
+
+    labelBadge.textContent = "Analizando...";
+    labelBadge.className = "signal-label";
+
+    scoreContainer.style.display = "block";
+    scoreValue.style.display = "block";
+    scoreValue.textContent = "0.00";
+
+    confidenceBar.style.width = "0%";
+    confidenceBar.className = "confidence-bar";
+
+    signalsList.innerHTML = "<li>Procesando...</li>";
+  }
+
+  // ======================================================
+  // MAIN CLICK
   // ======================================================
 
   analyzeBtn.addEventListener("click", async () => {
     resetUI();
-    console.log("🔎 Analizando página...");
 
     try {
       const tab = await getActiveTab();
@@ -41,9 +60,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // =====================================================
+  // ======================================================
   // TAB
-  // =====================================================
+  // ======================================================
 
   async function getActiveTab() {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -64,44 +83,41 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ======================================================
-  // TEXT EXTRACTION (robusto para SPA como iProfesional)
+  // TEXT EXTRACTION
   // ======================================================
 
- async function getPageText(tab) {
+  async function getPageText(tab) {
 
-  // 1️⃣ Inyectar siempre el content script antes de pedir texto
-  await chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    files: ["content_script.js"]
-  });
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["content_script.js"]
+    });
 
-  // 2️⃣ Esperar un poco (SPA rendering)
-  await new Promise(resolve => setTimeout(resolve, 800));
+    await new Promise(resolve => setTimeout(resolve, 800));
 
-  // 3️⃣ Enviar mensaje correctamente (MV3-safe)
-  return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
 
-    chrome.tabs.sendMessage(
-      tab.id,
-      { action: "extractText" },
-      (response) => {
+      chrome.tabs.sendMessage(
+        tab.id,
+        { action: "extractText" },
+        (response) => {
 
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+
+          if (!response) {
+            reject(new Error("Sin respuesta del content script"));
+            return;
+          }
+
+          resolve(response);
         }
+      );
 
-        if (!response) {
-          reject(new Error("Sin respuesta del content script"));
-          return;
-        }
-
-        resolve(response);
-      }
-    );
-
-  });
-}
+    });
+  }
 
   // ======================================================
   // BACKEND CALL
@@ -133,70 +149,99 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ======================================================
-  // UI UPDATE
+  // UPDATE UI
   // ======================================================
-
-  function resetUI() {
-    errorDiv.style.display = "none";
-    errorDiv.textContent = "";
-
-    labelBadge.textContent = "Analizando...";
-    labelBadge.className = "signal-label";
-
-    scoreValue.textContent = "0.00";
-    confidenceBar.style.width = "0%";
-    confidenceBar.className = "confidence-bar";
-
-    signalsList.innerHTML = "<li>Procesando...</li>";
-  }
 
   function updateUI(data) {
 
-  if (!data.analysis || !data.analysis.level) {
-    showError("Respuesta inválida del servidor.");
-    return;
+    if (!data.analysis || !data.analysis.level) {
+      showError("Respuesta inválida del servidor.");
+      return;
+    }
+
+    const level = data.analysis.level;
+    const indicators = data.analysis.indicators || [];
+    const plan = data.meta?.plan || "free";
+
+    let risk = 0;
+    if (level === "bajo") risk = 0.2;
+    else if (level === "medio") risk = 0.5;
+    else if (level === "alto") risk = 0.8;
+
+    labelBadge.className = "signal-label";
+    confidenceBar.className = "confidence-bar";
+    signalsList.innerHTML = "";
+
+    // ================= FREE =================
+    if (plan === "free") {
+
+      scoreContainer.style.display = "none"; // 👈 oculta toda la línea
+
+      confidenceBar.style.width = (risk * 100) + "%";
+
+      // color barra en FREE
+      if (level === "bajo") {
+        confidenceBar.classList.add("bar-low");
+      } else if (level === "medio") {
+        confidenceBar.classList.add("bar-medium");
+      } else {
+        confidenceBar.classList.add("bar-high");
+      }
+
+      labelBadge.textContent = "Estado estructural observado";
+
+      if (indicators.length > 0) {
+        indicators.slice(0, 5).forEach(signal => {
+          const li = document.createElement("li");
+          li.textContent = signal.title;
+          signalsList.appendChild(li);
+        });
+      } else {
+        signalsList.innerHTML = "<li>No se detectaron señales estructurales relevantes</li>";
+      }
+
+      const advice = document.createElement("div");
+      advice.style.marginTop = "12px";
+      advice.style.fontSize = "0.85rem";
+      advice.style.opacity = "0.85";
+      advice.innerText =
+        "Este análisis muestra señales estructurales observables. Puede ser útil contrastar información antes de compartir o actuar.";
+
+      signalsList.appendChild(advice);
+
+      return;
+    }
+
+    // ================= PRO =================
+
+    scoreContainer.style.display = "block";
+    scoreValue.textContent = risk.toFixed(2);
+    confidenceBar.style.width = (risk * 100) + "%";
+
+    if (indicators.length > 0) {
+      indicators.forEach(signal => {
+        const li = document.createElement("li");
+        li.textContent = signal.title;
+        signalsList.appendChild(li);
+      });
+    } else {
+      signalsList.innerHTML = "<li>No se detectaron señales relevantes</li>";
+    }
+
+    if (level === "bajo") {
+      labelBadge.textContent = "Riesgo Bajo";
+      labelBadge.classList.add("risk-low");
+      confidenceBar.classList.add("bar-low");
+    } else if (level === "medio") {
+      labelBadge.textContent = "Riesgo Medio";
+      labelBadge.classList.add("risk-medium");
+      confidenceBar.classList.add("bar-medium");
+    } else {
+      labelBadge.textContent = "Riesgo Alto";
+      labelBadge.classList.add("risk-high");
+      confidenceBar.classList.add("bar-high");
+    }
   }
-
-  const level = data.analysis.level;
-  const indicators = data.analysis.indicators || [];
-
-  let risk = 0;
-  if (level === "bajo") risk = 0.2;
-  else if (level === "medio") risk = 0.5;
-  else if (level === "alto") risk = 0.8;
-
-  scoreValue.textContent = risk.toFixed(2);
-  confidenceBar.style.width = (risk * 100) + "%";
-
-  labelBadge.className = "signal-label";
-  confidenceBar.className = "confidence-bar";
-
-  signalsList.innerHTML = "";
-
-  if (indicators.length > 0) {
-    indicators.slice(0, 5).forEach(signal => {
-      const li = document.createElement("li");
-      li.textContent = signal.title;   // ← importante
-      signalsList.appendChild(li);
-    });
-  } else {
-    signalsList.innerHTML = "<li>No se detectaron señales relevantes</li>";
-  }
-
-  if (level === "bajo") {
-    labelBadge.textContent = "Riesgo Bajo";
-    labelBadge.classList.add("risk-low");
-    confidenceBar.classList.add("bar-low");
-  } else if (level === "medio") {
-    labelBadge.textContent = "Riesgo Medio";
-    labelBadge.classList.add("risk-medium");
-    confidenceBar.classList.add("bar-medium");
-  } else {
-    labelBadge.textContent = "Riesgo Alto";
-    labelBadge.classList.add("risk-high");
-    confidenceBar.classList.add("bar-high");
-  }
-}
 
   function showError(message) {
     errorDiv.textContent = message;

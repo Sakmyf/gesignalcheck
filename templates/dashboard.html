@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SignalCheck – Evaluación Estructural</title>
+
+<style>
+body {
+    margin:0;
+    font-family: Inter, system-ui, sans-serif;
+    background:#0b1220;
+    color:#d1d5db;
+}
+
+.container {
+    max-width:1100px;
+    margin:auto;
+    padding:40px 24px;
+}
+
+.header-title {
+    font-size:2rem;
+    color:#f3f4f6;
+    margin-bottom:6px;
+}
+
+.subtitle {
+    opacity:0.65;
+    margin-bottom:40px;
+}
+
+.index-box {
+    background:#111827;
+    padding:40px;
+    border-radius:12px;
+    text-align:center;
+    margin-bottom:40px;
+    border:1px solid #1f2937;
+}
+
+.index-value {
+    font-size:4rem;
+    font-weight:800;
+    color:#60a5fa;
+}
+
+.level {
+    font-size:1.1rem;
+    margin-top:10px;
+    opacity:0.8;
+}
+
+.section {
+    background:#111827;
+    padding:30px;
+    border-radius:12px;
+    margin-bottom:30px;
+    border:1px solid #1f2937;
+}
+
+.section h3 {
+    margin-top:0;
+    margin-bottom:20px;
+    font-size:1.2rem;
+    color:#f3f4f6;
+}
+
+.bar-container {
+    margin:20px 0;
+}
+
+.bar-label {
+    margin-bottom:6px;
+    font-size:0.9rem;
+    opacity:0.8;
+}
+
+.bar {
+    height:8px;
+    background:#1f2937;
+    border-radius:4px;
+    overflow:hidden;
+}
+
+.bar-fill {
+    height:8px;
+    background:#3b82f6;
+}
+
+ul {
+    padding-left:18px;
+}
+
+.meta-info p {
+    margin:6px 0;
+    font-size:0.9rem;
+    opacity:0.75;
+}
+
+.footer {
+    margin-top:40px;
+    font-size:0.8rem;
+    opacity:0.6;
+    text-align:center;
+    border-top:1px solid #1f2937;
+    padding-top:20px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="header-title">
+Análisis estructural ampliado
+</div>
+
+<div class="subtitle">
+Evaluación basada en señales estructurales observables.
+</div>
+
+<div class="index-box">
+    <div class="index-value">
+        {{ "%.2f"|format(structural_index) }}
+    </div>
+    <div class="level">
+        Nivel estructural: {{ level|capitalize }}
+    </div>
+</div>
+
+<div class="section">
+    <h3>Desglose estructural</h3>
+
+    <div class="bar-container">
+        <div class="bar-label">Intensidad retórica</div>
+        <div class="bar">
+            <div class="bar-fill" style="width: {{ rhetorical_score * 100 }}%"></div>
+        </div>
+    </div>
+
+    <div class="bar-container">
+        <div class="bar-label">Coherencia narrativa</div>
+        <div class="bar">
+            <div class="bar-fill" style="width: {{ narrative_score * 100 }}%"></div>
+        </div>
+    </div>
+
+    <div class="bar-container">
+        <div class="bar-label">Ausencia de fuentes</div>
+        <div class="bar">
+            <div class="bar-fill" style="width: {{ absence_score * 100 }}%"></div>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h3>Preguntas críticas antes de actuar</h3>
+    <ul>
+        <li>¿Las afirmaciones incluyen respaldo verificable?</li>
+        <li>¿Existen fuentes alternativas que aporten contexto adicional?</li>
+        <li>¿El lenguaje prioriza impacto emocional sobre evidencia estructural?</li>
+    </ul>
+</div>
+
+<div class="section meta-info">
+    <h3>Información técnica</h3>
+    <p><strong>Clave de análisis:</strong> {{ analysis_key }}</p>
+    <p><strong>Motor:</strong> {{ engine_version }}</p>
+</div>
+
+<div class="footer">
+SignalCheck no determina veracidad. Ningún sistema automatizado reemplaza el juicio humano.
+</div>
+
+</div>
+
+</body>
+</html>

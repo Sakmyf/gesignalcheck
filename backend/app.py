@@ -1,11 +1,13 @@
-print("APP FILE ACTUAL 11.0")
+print("APP FILE ACTUAL 11.4 - dashboard HTML enabled - stable")
 
 # ==========================================================
 # IMPORTS
 # ==========================================================
 
-from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi import FastAPI, HTTPException, Header, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from urllib.parse import urlparse
@@ -40,10 +42,18 @@ app.add_middleware(
 )
 
 # ==========================================================
-# DB INIT
+# TEMPLATES CONFIG (IMPORTANTE)
 # ==========================================================
 
-Base.metadata.create_all(bind=engine)
+templates = Jinja2Templates(directory="../templates")
+
+# ==========================================================
+# DB INIT (SAFE STARTUP INIT)
+# ==========================================================
+
+@app.on_event("startup")
+def startup_event():
+    Base.metadata.create_all(bind=engine)
 
 # ==========================================================
 # INPUT MODEL
@@ -62,7 +72,7 @@ def root():
     return {"status": "GE SignalCheck API online"}
 
 # ==========================================================
-# VERIFY ENDPOINT
+# VERIFY ENDPOINT (NO TOCADO)
 # ==========================================================
 
 @app.post("/v3/verify")
@@ -71,10 +81,6 @@ async def verify(
     x_extension_id: str = Header(None),
     db: Session = Depends(get_db)
 ):
-
-    # -------------------------
-    # VALIDATE EXTENSION
-    # -------------------------
 
     if not x_extension_id:
         raise HTTPException(status_code=401, detail="Extensión no identificada")
@@ -93,19 +99,13 @@ async def verify(
        extension.analyses_used >= extension.analyses_limit:
         raise HTTPException(status_code=403, detail="Límite de uso alcanzado")
 
-    # -------------------------
-    # VALIDATE TEXT
-    # -------------------------
+    plan_normalized = extension.plan.lower()
 
     if not data.text or len(data.text.strip()) < 30:
         raise HTTPException(status_code=400, detail="Texto insuficiente")
 
     text = data.text
     url = data.url or ""
-
-    # -------------------------
-    # HASH + ANALYSIS KEY
-    # -------------------------
 
     content_hash = generate_content_hash(text)
 
@@ -115,10 +115,6 @@ async def verify(
         engine_version=ENGINE_VERSION,
         prompt_version=PROMPT_VERSION
     )
-
-    # -------------------------
-    # CACHE CHECK
-    # -------------------------
 
     existing_log = (
         db.query(AnalysisLog)
@@ -133,32 +129,24 @@ async def verify(
                 "summary": "Resultado recuperado desde cache.",
                 "indicators": [],
                 "shown_indicators": 0,
-                "note": "Este análisis ya había sido procesado anteriormente."
+                "note": "Este análisis ya había sido procesado anteriormente.",
+                "structural_index": existing_log.risk_index
             },
             "meta": {
                 "engine_version": existing_log.engine_version,
                 "analysis_key": analysis_key,
-                "cached": True
+                "cached": True,
+                "premium_available": True,
+                "plan": plan_normalized,
+                "disclaimer": "SignalCheck no determina veracidad. Ningún sistema automatizado reemplaza el juicio humano."
             }
         }
-
-    # -------------------------
-    # RUN ENGINE
-    # -------------------------
 
     result = analyze_context(text, url)
     status_color, level = interpret_score(result.get("score", 0))
 
-    # -------------------------
-    # DETERMINE SITE TYPE
-    # -------------------------
-
     parsed = urlparse(url)
     site_type = parsed.netloc if parsed.netloc else "unknown"
-
-    # -------------------------
-    # SAVE LOG
-    # -------------------------
 
     analysis_log = AnalysisLog(
         trust_score=result.get("quality_score", 0),
@@ -173,17 +161,8 @@ async def verify(
     )
 
     db.add(analysis_log)
-
-    # -------------------------
-    # INCREMENT USAGE
-    # -------------------------
-
     extension.analyses_used += 1
     db.commit()
-
-    # -------------------------
-    # BUILD INDICATORS
-    # -------------------------
 
     indicators = [
         {
@@ -194,17 +173,14 @@ async def verify(
         for s in result.get("signals", [])[:5]
     ]
 
-    # -------------------------
-    # RESPONSE
-    # -------------------------
-
     return {
         "analysis": {
             "level": level,
             "summary": result.get("label"),
             "indicators": indicators,
             "shown_indicators": len(indicators),
-            "note": "Se muestran las señales estructurales más relevantes para esta evaluación."
+            "note": "Se muestran las señales estructurales más relevantes para esta evaluación.",
+            "structural_index": result.get("score", 0)
         },
         "meta": {
             "engine_version": ENGINE_VERSION,
@@ -213,9 +189,64 @@ async def verify(
             "analysis_key": analysis_key,
             "cached": False,
             "premium_available": True,
+            "plan": plan_normalized,
             "disclaimer": "SignalCheck no determina veracidad. Ningún sistema automatizado reemplaza el juicio humano."
         }
     }
+
+# ==========================================================
+# DASHBOARD JSON (SE MANTIENE)
+# ==========================================================
+
+@app.get("/v3/dashboard/{analysis_key}")
+async def dashboard_view(analysis_key: str, db: Session = Depends(get_db)):
+
+    log = db.query(AnalysisLog).filter(
+        AnalysisLog.analysis_key == analysis_key
+    ).first()
+
+    if not log:
+        raise HTTPException(status_code=404, detail="Análisis no encontrado")
+
+    return {
+        "analysis_key": analysis_key,
+        "engine_version": log.engine_version,
+        "level": log.level,
+        "structural_index": log.risk_index,
+        "trust_score": log.trust_score,
+        "rhetorical_score": log.rhetorical_score,
+        "narrative_score": log.narrative_score,
+        "absence_score": log.absence_score
+    }
+
+# ==========================================================
+# DASHBOARD HTML REAL (NUEVO)
+# ==========================================================
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_page(request: Request, key: str, db: Session = Depends(get_db)):
+
+    log = db.query(AnalysisLog).filter(
+        AnalysisLog.analysis_key == key
+    ).first()
+
+    if not log:
+        raise HTTPException(status_code=404, detail="Análisis no encontrado")
+
+    return templates.TemplateResponse(
+        "dashboard.html",
+        {
+            "request": request,
+            "analysis_key": log.analysis_key,
+            "engine_version": log.engine_version,
+            "level": log.level,
+            "structural_index": log.risk_index,
+            "trust_score": log.trust_score,
+            "rhetorical_score": log.rhetorical_score,
+            "narrative_score": log.narrative_score,
+            "absence_score": log.absence_score
+        }
+    )
 
 # ==========================================================
 # PREMIUM JSON ENDPOINT
