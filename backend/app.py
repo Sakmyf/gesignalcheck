@@ -4,6 +4,11 @@ print("APP FILE ACTUAL 11.4 - dashboard HTML enabled - stable")
 # IMPORTS
 # ==========================================================
 
+<<<<<<< HEAD
+import os
+
+=======
+>>>>>>> 68044471b1d1d0cded3354d819ef1d7181eae856
 from fastapi import FastAPI, HTTPException, Header, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -26,19 +31,57 @@ from backend.utils.content_versioning import (
 
 ENGINE_VERSION = "v8.5"
 PROMPT_VERSION = "none"
+<<<<<<< HEAD
+
+# ==========================================================
+# KEYS — desde variables de entorno, nunca desde archivos
+# ==========================================================
+# En Railway: Settings → Variables
+#   PRIVATE_KEY = contenido de private.pem  (saltos de línea como \n)
+#   PUBLIC_KEY  = contenido de public.pem   (saltos de línea como \n)
+#
+# Uso futuro (JWT RS256 Sprint 1):
+#   from jose import jwt
+#   PRIVATE_KEY y PUBLIC_KEY ya disponibles abajo
+# ==========================================================
+
+PRIVATE_KEY = os.environ.get("PRIVATE_KEY", "").replace("\\n", "\n")
+PUBLIC_KEY  = os.environ.get("PUBLIC_KEY",  "").replace("\\n", "\n")
+=======
+>>>>>>> 68044471b1d1d0cded3354d819ef1d7181eae856
 
 # ==========================================================
 # FASTAPI INIT
 # ==========================================================
 
 app = FastAPI(title="GE SignalCheck API v8 - Stable")
+<<<<<<< HEAD
+
+# ==========================================================
+# CORS — usa variable ALLOWED_ORIGINS de Railway
+# ==========================================================
+# En Railway ya existe ALLOWED_ORIGINS con la URL del servicio.
+# Para agregar la extensión Chrome, editá esa variable así:
+#   https://gesignalcheck-production-8e78.up.railway.app,chrome-extension://TU_ID_32_CHARS
+# Separado por coma, sin espacios.
+# En desarrollo local podés agregar http://localhost.
+# ==========================================================
+
+_env            = os.environ.get("ENV_MODE", "production")
+_origins_raw    = os.environ.get("ALLOWED_ORIGINS", "")
+_origins_list   = [o.strip() for o in _origins_raw.split(",") if o.strip()]
+
+if _env == "development":
+    _origins_list += ["http://localhost", "http://localhost:3000"]
+=======
+>>>>>>> 68044471b1d1d0cded3354d819ef1d7181eae856
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_origins_list,
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "x-extension-id"],
 )
 
 # ==========================================================
@@ -72,6 +115,17 @@ def root():
     return {"status": "GE SignalCheck API online"}
 
 # ==========================================================
+<<<<<<< HEAD
+# HEALTH
+# ==========================================================
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "engine_version": ENGINE_VERSION}
+
+# ==========================================================
+=======
+>>>>>>> 68044471b1d1d0cded3354d819ef1d7181eae856
 # VERIFY ENDPOINT (NO TOCADO)
 # ==========================================================
 
