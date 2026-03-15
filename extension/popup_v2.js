@@ -12,7 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const labelBadge = document.getElementById("labelBadge");
   const errorDiv = document.getElementById("error");
 
-  const scoreContainer = scoreValue.parentElement; // 👈 importante
+  const scoreContainer = scoreValue.parentElement;
 
   // ======================================================
   // RESET UI
@@ -26,7 +26,6 @@ document.addEventListener("DOMContentLoaded", () => {
     labelBadge.className = "signal-label";
 
     scoreContainer.style.display = "block";
-    scoreValue.style.display = "block";
     scoreValue.textContent = "0.00";
 
     confidenceBar.style.width = "0%";
@@ -69,12 +68,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!tabs.length) throw new Error("No se encontró pestaña activa.");
 
     const tab = tabs[0];
+
     if (!tab.id) throw new Error("ID de pestaña inválido.");
     if (!tab.url) throw new Error("No se pudo obtener la URL.");
 
     const blockedProtocols = [
       "chrome://", "chrome-extension://", "edge://", "about:", "file://"
     ];
+
     if (blockedProtocols.some(p => tab.url.startsWith(p))) {
       throw new Error("No se puede analizar esta página.");
     }
@@ -135,7 +136,7 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       body: JSON.stringify({
         url: extracted.url,
-        text: extracted.text.substring(0, 15000)
+        text: extracted.text
       })
     });
 
@@ -161,73 +162,120 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const level = data.analysis.level;
     const indicators = data.analysis.indicators || [];
-    const plan = data.meta?.plan || "free";
+    const plan = (data.meta?.plan || "free").toLowerCase();
+    const risk = data.analysis.structural_index ?? 0;
 
-    let risk = 0;
-    if (level === "bajo") risk = 0.2;
-    else if (level === "medio") risk = 0.5;
-    else if (level === "alto") risk = 0.8;
-
-    labelBadge.className = "signal-label";
+    confidenceBar.style.width = (risk * 100) + "%";
     confidenceBar.className = "confidence-bar";
+    labelBadge.className = "signal-label";
+
     signalsList.innerHTML = "";
 
     // ================= FREE =================
+
     if (plan === "free") {
 
-      scoreContainer.style.display = "none"; // 👈 oculta toda la línea
+      scoreContainer.style.display = "none";
+      setLevelVisual(level);
 
-      confidenceBar.style.width = (risk * 100) + "%";
+      indicators.slice(0, 3).forEach(signal => {
+        const li = document.createElement("li");
+        li.textContent = signal.title;
+        signalsList.appendChild(li);
+      });
 
-      // color barra en FREE
-      if (level === "bajo") {
-        confidenceBar.classList.add("bar-low");
-      } else if (level === "medio") {
-        confidenceBar.classList.add("bar-medium");
-      } else {
-        confidenceBar.classList.add("bar-high");
-      }
-
-      labelBadge.textContent = "Estado estructural observado";
-
-      if (indicators.length > 0) {
-        indicators.slice(0, 5).forEach(signal => {
-          const li = document.createElement("li");
-          li.textContent = signal.title;
-          signalsList.appendChild(li);
-        });
-      } else {
-        signalsList.innerHTML = "<li>No se detectaron señales estructurales relevantes</li>";
-      }
-
-      const advice = document.createElement("div");
-      advice.style.marginTop = "12px";
-      advice.style.fontSize = "0.85rem";
-      advice.style.opacity = "0.85";
-      advice.innerText =
-        "Este análisis muestra señales estructurales observables. Puede ser útil contrastar información antes de compartir o actuar.";
-
-      signalsList.appendChild(advice);
+      addUpgradeBox(
+        "Plan FREE activo",
+        "Mostrando análisis básico estructural.",
+        "Actualizá a PRO para ver score numérico y más señales.",
+        "https://gesignalcheck.com/upgrade"
+      );
 
       return;
     }
 
     // ================= PRO =================
 
-    scoreContainer.style.display = "block";
-    scoreValue.textContent = risk.toFixed(2);
-    confidenceBar.style.width = (risk * 100) + "%";
+    if (plan === "pro") {
 
-    if (indicators.length > 0) {
+      scoreContainer.style.display = "block";
+      scoreValue.textContent = risk.toFixed(2);
+      setLevelVisual(level);
+
+      indicators.slice(0, 5).forEach(signal => {
+        const li = document.createElement("li");
+        li.textContent = signal.title;
+        signalsList.appendChild(li);
+      });
+
+      addUpgradeBox(
+        "Plan PRO activo",
+        "Acceso a score estructural extendido.",
+        "Actualizá a PREMIUM para análisis técnico completo.",
+        "https://gesignalcheck.com/upgrade"
+      );
+
+      return;
+    }
+
+    // ================= PREMIUM =================
+
+    if (plan === "premium") {
+
+      scoreContainer.style.display = "block";
+      scoreValue.textContent = risk.toFixed(3);
+      setLevelVisual(level);
+
       indicators.forEach(signal => {
         const li = document.createElement("li");
         li.textContent = signal.title;
         signalsList.appendChild(li);
       });
-    } else {
-      signalsList.innerHTML = "<li>No se detectaron señales relevantes</li>";
+
+      addUpgradeBox(
+        "Plan PREMIUM activo",
+        "Snapshot estructural disponible.",
+        "Modo EXPERT habilita auditoría institucional avanzada.",
+        "https://gesignalcheck.com/upgrade"
+      );
+
+      return;
     }
 
+    // ================= EXPERT =================
+
+    if (plan === "expert") {
+
+      scoreContainer.style.display = "block";
+      scoreValue.textContent = risk.toFixed(4);
+      setLevelVisual(level);
+
+      indicators.forEach(signal => {
+        const li = document.createElement("li");
+        li.textContent = signal.title;
+        signalsList.appendChild(li);
+      });
+
+      const expertBox = document.createElement("div");
+      expertBox.style.marginTop = "14px";
+      expertBox.style.padding = "12px";
+      expertBox.style.borderRadius = "10px";
+      expertBox.style.background = "rgba(0,255,150,0.08)";
+      expertBox.style.fontSize = "0.85rem";
+      expertBox.innerHTML =
+        "<strong>Modo Auditoría Profesional Activo</strong><br>Informe estructural trazable y consistente.";
+
+      signalsList.appendChild(expertBox);
+
+      return;
+    }
+  }
+
+  // ======================================================
+  // HELPERS
+  // ======================================================
+
+  function setLevelVisual(level) {
     if (level === "bajo") {
       labelBadge.textContent = "Riesgo Bajo";
       labelBadge.classList.add("risk-low");
@@ -243,16 +291,46 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function addUpgradeBox(title, line1, line2, upgradeUrl) {
+
+    const box = document.createElement("div");
+    box.style.marginTop = "14px";
+    box.style.padding = "12px";
+    box.style.borderRadius = "10px";
+    box.style.background = "rgba(255,255,255,0.04)";
+    box.style.fontSize = "0.85rem";
+    box.style.lineHeight = "1.4";
+
+    const button = document.createElement("button");
+    button.textContent = "Actualizar plan";
+    button.style.marginTop = "8px";
+    button.style.padding = "6px 10px";
+    button.style.fontSize = "0.8rem";
+    button.style.borderRadius = "6px";
+    button.style.border = "none";
+    button.style.cursor = "pointer";
+    button.style.background = "#2e7dff";
+    button.style.color = "#fff";
+
+    button.addEventListener("click", () => {
+      chrome.tabs.create({ url: upgradeUrl });
+    });
+
+    box.innerHTML = `
+      <strong>${title}</strong><br>
+      ${line1}<br>
+      <span style="opacity:0.7">${line2}</span>
+    `;
+
+    box.appendChild(button);
+    signalsList.appendChild(box);
+  }
+
   function showError(message) {
     errorDiv.textContent = message;
     errorDiv.style.display = "block";
-
     labelBadge.textContent = "Error";
-    labelBadge.className = "signal-label";
-
     confidenceBar.style.width = "0%";
-    confidenceBar.className = "confidence-bar";
-
     signalsList.innerHTML = "";
   }
 
