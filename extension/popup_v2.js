@@ -168,11 +168,17 @@ document.addEventListener("DOMContentLoaded", () => {
     confidenceBar.style.width = (risk * 100) + "%";
     confidenceBar.className = "confidence-bar";
     labelBadge.className = "signal-label";
+<<<<<<< HEAD
 
     signalsList.innerHTML = "";
 
     // ================= FREE =================
 
+=======
+    signalsList.innerHTML = "";
+
+    // ================= FREE =================
+>>>>>>> 60b46bb (Reconstruccion completa SignalCheck)
     if (plan === "free") {
 
       scoreContainer.style.display = "none";
@@ -195,7 +201,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ================= PRO =================
+<<<<<<< HEAD
 
+=======
+>>>>>>> 60b46bb (Reconstruccion completa SignalCheck)
     if (plan === "pro") {
 
       scoreContainer.style.display = "block";
@@ -219,7 +228,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ================= PREMIUM =================
+<<<<<<< HEAD
 
+=======
+>>>>>>> 60b46bb (Reconstruccion completa SignalCheck)
     if (plan === "premium") {
 
       scoreContainer.style.display = "block";
@@ -243,7 +255,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ================= EXPERT =================
+<<<<<<< HEAD
 
+=======
+>>>>>>> 60b46bb (Reconstruccion completa SignalCheck)
     if (plan === "expert") {
 
       scoreContainer.style.display = "block";

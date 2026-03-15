@@ -118,6 +118,7 @@ def analyze_context(text: str, url: str = ""):
     risk_score = max(min(risk_points / MAX_RISK_SCORE, 1.0), 0.0)
 
     global_score = (risk_score * 0.75) + ((1 - quality_score) * 0.25)
+    global_score = round(global_score, 4)
 
     # ===============================
     # Decisión visual

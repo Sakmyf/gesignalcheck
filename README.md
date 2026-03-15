@@ -1,12 +1,24 @@
-\# Candado (MVP local)
+\\# Candado (MVP local)
 
-\- docs/DECISIONS.md — Casos reales y ajustes de puntaje
 
-\- docs/MANIFIESTO.md — Principios éticos y límites
 
-\- backend/app.py — API local (FastAPI)
+\\- docs/DECISIONS.md — Casos reales y ajustes de puntaje
 
-\- extension/ — Extensión de navegador (MV3)
+
+
+\\- docs/MANIFIESTO.md — Principios éticos y límites
+
+
+
+\\- backend/app.py — API local (FastAPI)
+
+
+
+\\- extension/ — Extensión de navegador (MV3)
+
+
+
+
 
 
 

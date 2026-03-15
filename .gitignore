@@ -1,7 +1,29 @@
+# entorno
 .env
-private.pem
-public.pem
+.env.*
+
+# claves y certificados
+*.pem
 *.key
-*.pyc
 *.crt
+
+# python
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# virtualenv
+.venv/
+venv/
+
+# sistema
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+
+# vscode / editor
+.vscode/
+.idea/
