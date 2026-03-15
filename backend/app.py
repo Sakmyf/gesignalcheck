@@ -4,11 +4,8 @@ print("APP FILE ACTUAL 11.4 - dashboard HTML enabled - stable")
 # IMPORTS
 # ==========================================================
 
-<<<<<<< HEAD
 import os
 
-=======
->>>>>>> 68044471b1d1d0cded3354d819ef1d7181eae856
 from fastapi import FastAPI, HTTPException, Header, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -31,7 +28,6 @@ from backend.utils.content_versioning import (
 
 ENGINE_VERSION = "v8.5"
 PROMPT_VERSION = "none"
-<<<<<<< HEAD
 
 # ==========================================================
 # KEYS — desde variables de entorno, nunca desde archivos
@@ -39,42 +35,26 @@ PROMPT_VERSION = "none"
 # En Railway: Settings → Variables
 #   PRIVATE_KEY = contenido de private.pem  (saltos de línea como \n)
 #   PUBLIC_KEY  = contenido de public.pem   (saltos de línea como \n)
-#
-# Uso futuro (JWT RS256 Sprint 1):
-#   from jose import jwt
-#   PRIVATE_KEY y PUBLIC_KEY ya disponibles abajo
-# ==========================================================
 
 PRIVATE_KEY = os.environ.get("PRIVATE_KEY", "").replace("\\n", "\n")
-PUBLIC_KEY  = os.environ.get("PUBLIC_KEY",  "").replace("\\n", "\n")
-=======
->>>>>>> 68044471b1d1d0cded3354d819ef1d7181eae856
+PUBLIC_KEY  = os.environ.get("PUBLIC_KEY", "").replace("\\n", "\n")
 
 # ==========================================================
 # FASTAPI INIT
 # ==========================================================
 
 app = FastAPI(title="GE SignalCheck API v8 - Stable")
-<<<<<<< HEAD
 
 # ==========================================================
 # CORS — usa variable ALLOWED_ORIGINS de Railway
 # ==========================================================
-# En Railway ya existe ALLOWED_ORIGINS con la URL del servicio.
-# Para agregar la extensión Chrome, editá esa variable así:
-#   https://gesignalcheck-production-8e78.up.railway.app,chrome-extension://TU_ID_32_CHARS
-# Separado por coma, sin espacios.
-# En desarrollo local podés agregar http://localhost.
-# ==========================================================
 
-_env            = os.environ.get("ENV_MODE", "production")
-_origins_raw    = os.environ.get("ALLOWED_ORIGINS", "")
-_origins_list   = [o.strip() for o in _origins_raw.split(",") if o.strip()]
+_env = os.environ.get("ENV_MODE", "production")
+_origins_raw = os.environ.get("ALLOWED_ORIGINS", "")
+_origins_list = [o.strip() for o in _origins_raw.split(",") if o.strip()]
 
 if _env == "development":
     _origins_list += ["http://localhost", "http://localhost:3000"]
-=======
->>>>>>> 68044471b1d1d0cded3354d819ef1d7181eae856
 
 app.add_middleware(
     CORSMiddleware,
@@ -85,13 +65,13 @@ app.add_middleware(
 )
 
 # ==========================================================
-# TEMPLATES CONFIG (IMPORTANTE)
+# TEMPLATES CONFIG
 # ==========================================================
 
 templates = Jinja2Templates(directory="../templates")
 
 # ==========================================================
-# DB INIT (SAFE STARTUP INIT)
+# DB INIT
 # ==========================================================
 
 @app.on_event("startup")
@@ -115,7 +95,6 @@ def root():
     return {"status": "GE SignalCheck API online"}
 
 # ==========================================================
-<<<<<<< HEAD
 # HEALTH
 # ==========================================================
 
@@ -124,9 +103,7 @@ def health():
     return {"status": "ok", "engine_version": ENGINE_VERSION}
 
 # ==========================================================
-=======
->>>>>>> 68044471b1d1d0cded3354d819ef1d7181eae856
-# VERIFY ENDPOINT (NO TOCADO)
+# VERIFY ENDPOINT
 # ==========================================================
 
 @app.post("/v3/verify")
@@ -249,7 +226,7 @@ async def verify(
     }
 
 # ==========================================================
-# DASHBOARD JSON (SE MANTIENE)
+# DASHBOARD JSON
 # ==========================================================
 
 @app.get("/v3/dashboard/{analysis_key}")
@@ -274,7 +251,7 @@ async def dashboard_view(analysis_key: str, db: Session = Depends(get_db)):
     }
 
 # ==========================================================
-# DASHBOARD HTML REAL (NUEVO)
+# DASHBOARD HTML
 # ==========================================================
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -303,7 +280,7 @@ async def dashboard_page(request: Request, key: str, db: Session = Depends(get_d
     )
 
 # ==========================================================
-# PREMIUM JSON ENDPOINT
+# PREMIUM
 # ==========================================================
 
 @app.post("/v3/verify/premium")
@@ -330,7 +307,7 @@ async def verify_premium(
     }
 
 # ==========================================================
-# REPORT ENDPOINT
+# REPORT
 # ==========================================================
 
 @app.post("/v3/report")
