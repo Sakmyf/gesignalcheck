@@ -30,25 +30,11 @@ ENGINE_VERSION = "v8.5"
 PROMPT_VERSION = "none"
 
 # ==========================================================
-# KEYS — desde variables de entorno, nunca desde archivos
-# ==========================================================
-# En Railway: Settings → Variables
-#   PRIVATE_KEY = contenido de private.pem  (saltos de línea como \n)
-#   PUBLIC_KEY  = contenido de public.pem   (saltos de línea como \n)
-<<<<<<< HEAD
-
-PRIVATE_KEY = os.environ.get("PRIVATE_KEY", "").replace("\\n", "\n")
-PUBLIC_KEY  = os.environ.get("PUBLIC_KEY", "").replace("\\n", "\n")
-=======
-#
-# Uso futuro (JWT RS256 Sprint 1):
-#   from jose import jwt
-#   PRIVATE_KEY y PUBLIC_KEY ya disponibles abajo
+# KEYS — desde variables de entorno
 # ==========================================================
 
 PRIVATE_KEY = os.environ.get("PRIVATE_KEY", "").replace("\\n", "\n")
-PUBLIC_KEY  = os.environ.get("PUBLIC_KEY",  "").replace("\\n", "\n")
->>>>>>> 60b46bb (Reconstruccion completa SignalCheck)
+PUBLIC_KEY = os.environ.get("PUBLIC_KEY", "").replace("\\n", "\n")
 
 # ==========================================================
 # FASTAPI INIT
@@ -57,25 +43,12 @@ PUBLIC_KEY  = os.environ.get("PUBLIC_KEY",  "").replace("\\n", "\n")
 app = FastAPI(title="GE SignalCheck API v8 - Stable")
 
 # ==========================================================
-# CORS — usa variable ALLOWED_ORIGINS de Railway
+# CORS
 # ==========================================================
-<<<<<<< HEAD
 
 _env = os.environ.get("ENV_MODE", "production")
 _origins_raw = os.environ.get("ALLOWED_ORIGINS", "")
 _origins_list = [o.strip() for o in _origins_raw.split(",") if o.strip()]
-=======
-# En Railway ya existe ALLOWED_ORIGINS con la URL del servicio.
-# Para agregar la extensión Chrome, editá esa variable así:
-#   https://gesignalcheck-production-8e78.up.railway.app,chrome-extension://TU_ID_32_CHARS
-# Separado por coma, sin espacios.
-# En desarrollo local podés agregar http://localhost.
-# ==========================================================
-
-_env            = os.environ.get("ENV_MODE", "production")
-_origins_raw    = os.environ.get("ALLOWED_ORIGINS", "")
-_origins_list   = [o.strip() for o in _origins_raw.split(",") if o.strip()]
->>>>>>> 60b46bb (Reconstruccion completa SignalCheck)
 
 if _env == "development":
     _origins_list += ["http://localhost", "http://localhost:3000"]
@@ -89,21 +62,13 @@ app.add_middleware(
 )
 
 # ==========================================================
-<<<<<<< HEAD
 # TEMPLATES CONFIG
-=======
-# TEMPLATES CONFIG (IMPORTANTE)
->>>>>>> 60b46bb (Reconstruccion completa SignalCheck)
 # ==========================================================
 
 templates = Jinja2Templates(directory="../templates")
 
 # ==========================================================
-<<<<<<< HEAD
 # DB INIT
-=======
-# DB INIT (SAFE STARTUP INIT)
->>>>>>> 60b46bb (Reconstruccion completa SignalCheck)
 # ==========================================================
 
 @app.on_event("startup")
@@ -135,11 +100,7 @@ def health():
     return {"status": "ok", "engine_version": ENGINE_VERSION}
 
 # ==========================================================
-<<<<<<< HEAD
 # VERIFY ENDPOINT
-=======
-# VERIFY ENDPOINT (NO TOCADO)
->>>>>>> 60b46bb (Reconstruccion completa SignalCheck)
 # ==========================================================
 
 @app.post("/v3/verify")
@@ -162,8 +123,7 @@ async def verify(
     if not extension.is_active:
         raise HTTPException(status_code=403, detail="Extensión desactivada")
 
-    if extension.analyses_limit > 0 and \
-       extension.analyses_used >= extension.analyses_limit:
+    if extension.analyses_limit > 0 and extension.analyses_used >= extension.analyses_limit:
         raise HTTPException(status_code=403, detail="Límite de uso alcanzado")
 
     plan_normalized = extension.plan.lower()
@@ -205,7 +165,7 @@ async def verify(
                 "cached": True,
                 "premium_available": True,
                 "plan": plan_normalized,
-                "disclaimer": "SignalCheck no determina veracidad. Ningún sistema automatizado reemplaza el juicio humano."
+                "disclaimer": "SignalCheck no determina veracidad."
             }
         }
 
@@ -246,7 +206,7 @@ async def verify(
             "summary": result.get("label"),
             "indicators": indicators,
             "shown_indicators": len(indicators),
-            "note": "Se muestran las señales estructurales más relevantes para esta evaluación.",
+            "note": "Se muestran las señales estructurales más relevantes.",
             "structural_index": result.get("score", 0)
         },
         "meta": {
@@ -257,118 +217,6 @@ async def verify(
             "cached": False,
             "premium_available": True,
             "plan": plan_normalized,
-            "disclaimer": "SignalCheck no determina veracidad. Ningún sistema automatizado reemplaza el juicio humano."
+            "disclaimer": "SignalCheck no determina veracidad."
         }
     }
-
-# ==========================================================
-<<<<<<< HEAD
-# DASHBOARD JSON
-=======
-# DASHBOARD JSON (SE MANTIENE)
->>>>>>> 60b46bb (Reconstruccion completa SignalCheck)
-# ==========================================================
-
-@app.get("/v3/dashboard/{analysis_key}")
-async def dashboard_view(analysis_key: str, db: Session = Depends(get_db)):
-
-    log = db.query(AnalysisLog).filter(
-        AnalysisLog.analysis_key == analysis_key
-    ).first()
-
-    if not log:
-        raise HTTPException(status_code=404, detail="Análisis no encontrado")
-
-    return {
-        "analysis_key": analysis_key,
-        "engine_version": log.engine_version,
-        "level": log.level,
-        "structural_index": log.risk_index,
-        "trust_score": log.trust_score,
-        "rhetorical_score": log.rhetorical_score,
-        "narrative_score": log.narrative_score,
-        "absence_score": log.absence_score
-    }
-
-# ==========================================================
-<<<<<<< HEAD
-# DASHBOARD HTML
-=======
-# DASHBOARD HTML REAL (NUEVO)
->>>>>>> 60b46bb (Reconstruccion completa SignalCheck)
-# ==========================================================
-
-@app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard_page(request: Request, key: str, db: Session = Depends(get_db)):
-
-    log = db.query(AnalysisLog).filter(
-        AnalysisLog.analysis_key == key
-    ).first()
-
-    if not log:
-        raise HTTPException(status_code=404, detail="Análisis no encontrado")
-
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {
-            "request": request,
-            "analysis_key": log.analysis_key,
-            "engine_version": log.engine_version,
-            "level": log.level,
-            "structural_index": log.risk_index,
-            "trust_score": log.trust_score,
-            "rhetorical_score": log.rhetorical_score,
-            "narrative_score": log.narrative_score,
-            "absence_score": log.absence_score
-        }
-    )
-
-# ==========================================================
-<<<<<<< HEAD
-# PREMIUM
-=======
-# PREMIUM JSON ENDPOINT
->>>>>>> 60b46bb (Reconstruccion completa SignalCheck)
-# ==========================================================
-
-@app.post("/v3/verify/premium")
-async def verify_premium(
-    data: VerifyRequest,
-    x_premium_token: str = Header(None)
-):
-
-    if not x_premium_token:
-        raise HTTPException(status_code=401, detail="Acceso premium requerido")
-
-    return {
-        "analysis": {
-            "level": "bajo",
-            "structural_index": 0.25,
-            "breakdown": {},
-            "all_detected_signals": ["estructura clara"],
-            "critical_questions": [
-                "¿Las afirmaciones principales incluyen respaldo verificable?",
-                "¿Existen fuentes alternativas que aporten contexto adicional?",
-                "¿El lenguaje prioriza impacto emocional sobre evidencia estructural?"
-            ]
-        }
-    }
-
-# ==========================================================
-<<<<<<< HEAD
-# REPORT
-=======
-# REPORT ENDPOINT
->>>>>>> 60b46bb (Reconstruccion completa SignalCheck)
-# ==========================================================
-
-@app.post("/v3/report")
-async def generate_report(
-    data: VerifyRequest,
-    x_premium_token: str = Header(None)
-):
-
-    if not x_premium_token:
-        raise HTTPException(status_code=401, detail="Acceso premium requerido")
-
-    return {"status": "PDF endpoint activo"}
