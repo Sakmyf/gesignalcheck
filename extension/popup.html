@@ -7,40 +7,27 @@
 </head>
 <body>
 
-  <div class="signal-popup">
+  <div class="container">
 
-    <div class="signal-title">SignalCheck</div>
-    <div class="signal-subtitle">
-      Análisis contextual de información
+    <!-- LÁSER -->
+    <div id="scanLine" class="scan-line"></div>
+
+    <!-- HEADER -->
+    <div class="header">
+      <h1>SignalCheck</h1>
+      <div class="subtitle">Análisis estructural del contenido</div>
     </div>
 
-    <div id="labelBadge" class="signal-label">
-      Esperando análisis...
-    </div>
+    <!-- RESULTADO -->
+    <div id="labelBadge" class="signal-label">Iniciando...</div>
+    <div id="summary" class="hidden insight-box"></div>
 
-    <div class="confidence-bar-container">
-      <div id="confidenceBar" class="confidence-bar"></div>
-    </div>
-
-    <div class="score-text">
-      Puntaje: <span id="scoreValue">0.00</span>
-    </div>
-
-    <div class="signals">
-      <strong>Señales detectadas:</strong>
-      <ul id="signalsList">
-        <li>Ninguna aún</li>
-      </ul>
-    </div>
-
-    <div id="error" class="error"></div>
-
-    <button id="analyzeBtn" class="signal-btn">
-      Analizar página
-    </button>
+    <!-- BOTÓN -->
+    <button id="analyzeBtn">Re-analizar página</button>
 
   </div>
 
-  <script src="popup_v2.js"></script>
+  <script src="popup.js"></script>
+
 </body>
 </html>

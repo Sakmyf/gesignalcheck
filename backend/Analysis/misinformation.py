@@ -1,17 +1,18 @@
-﻿
-# misinformation.py
+﻿# misinformation.py
+
 import re
 from backend.Analysis.rules_types import RuleResult
 
 
 SERIOUS_CLAIMS = [
-    r"fraude",
-    r"estafa",
-    r"corrupción",
-    r"manipulación",
-    r"engaño",
-    r"ilegal",
+    r"\bfraude\b",
+    r"\bestafa\b",
+    r"\bcorrupción\b",
+    r"\bmanipulación\b",
+    r"\bengaño\b",
+    r"\bilegal\b",
 ]
+
 
 CONSPIRACY_PATTERNS = [
     r"no quieren que sepas",
@@ -19,6 +20,7 @@ CONSPIRACY_PATTERNS = [
     r"nadie habla de",
     r"verdad oculta",
 ]
+
 
 CATEGORICAL_PATTERNS = [
     r"es un hecho",
@@ -43,26 +45,36 @@ def check_misinformation(text: str) -> RuleResult:
 
     result = RuleResult()
 
+    text_lower = text.lower()
+
     # 🔴 Acusaciones graves sin atribución
-    for claim in SERIOUS_CLAIMS:
-        if re.search(claim, text, re.I):
-            if not any(re.search(a, text, re.I) for a in ATTRIBUTION_PATTERNS):
-                result.points += 1.2
-                result.reasons.append("serious_accusation_without_source")
-                result.evidence.append("Acusación grave sin fuente atribuida")
+    serious_found = [c for c in SERIOUS_CLAIMS if re.search(c, text_lower)]
+
+    if serious_found:
+
+        has_source = any(re.search(a, text_lower) for a in ATTRIBUTION_PATTERNS)
+
+        if not has_source:
+            result.points += 0.9
+            result.reasons.append("serious_accusation_without_source")
+            result.evidence.append(
+                f"Acusación grave sin fuente: {', '.join(serious_found)}"
+            )
 
     # 🟠 Lenguaje conspirativo
-    for pattern in CONSPIRACY_PATTERNS:
-        if re.search(pattern, text, re.I):
-            result.points += 1.0
-            result.reasons.append("conspiracy_language")
-            result.evidence.append("Lenguaje conspirativo detectado")
+    conspiracies = [p for p in CONSPIRACY_PATTERNS if re.search(p, text_lower)]
+
+    if conspiracies:
+        result.points += 0.8
+        result.reasons.append("conspiracy_language")
+        result.evidence.append("Lenguaje conspirativo detectado")
 
     # 🟡 Afirmaciones categóricas fuertes
-    for pattern in CATEGORICAL_PATTERNS:
-        if re.search(pattern, text, re.I):
-            result.points += 0.7
-            result.reasons.append("categorical_claim")
-            result.evidence.append("Afirmación categórica fuerte")
+    categorical = [p for p in CATEGORICAL_PATTERNS if re.search(p, text_lower)]
+
+    if categorical:
+        result.points += 0.6
+        result.reasons.append("categorical_claim")
+        result.evidence.append("Afirmación categórica fuerte")
 
     return result

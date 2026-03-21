@@ -12,10 +12,23 @@ class RuleResult:
         self.reasons = reasons[:] if reasons else []
         self.evidence = evidence[:] if evidence else []
 
+    def add(self, points=0.0, reason=None, evidence=None):
+        """
+        Agrega puntos y evidencia al resultado.
+        """
+        self.points += points
+
+        if reason and reason not in self.reasons:
+            self.reasons.append(reason)
+
+        if evidence and evidence not in self.evidence:
+            self.evidence.append(evidence)
+
     def merge(self, other):
         """
         Combina otro RuleResult dentro de este.
         """
+
         if not isinstance(other, RuleResult):
             return
 
@@ -33,8 +46,10 @@ class RuleResult:
         """
         Limita los puntos dentro de un rango.
         """
+
         if self.points < min_value:
             self.points = min_value
+
         if self.points > max_value:
             self.points = max_value
 

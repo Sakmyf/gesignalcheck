@@ -1,45 +1,50 @@
-class AnalysisResult:
-    def __init__(self):
-        self.points = 0.0
-        self.reasons = []
-        self.evidence = []
+import re
+from backend.Analysis.rules_types import RuleResult
 
 
-def check_scientific_claims(text: str):
+MEDICAL_KEYWORDS = [
+    r"\bcura\b",
+    r"\bcurar\b",
+    r"tratamiento definitivo",
+    r"100 ?% efectivo",
+    r"comprobado científicamente",
+    r"reemplaza la medicina",
+    r"la medicina no quiere que sepas",
+    r"avalado por médicos",
+    r"científicamente probado"
+]
 
-    result = AnalysisResult()
-    lower = text.lower()
+SUPPORT_INDICATORS = [
+    "estudio",
+    "ensayo clínico",
+    "universidad",
+    "revista científica",
+    "publicado en",
+    "journal",
+    "investigación"
+]
 
-    # Palabras asociadas a afirmaciones médicas fuertes
-    medical_keywords = [
-        "cura", "curar", "tratamiento definitivo",
-        "100% efectivo", "comprobado científicamente",
-        "reemplaza la medicina", "la medicina no quiere que sepas",
-        "avalado por médicos", "científicamente probado"
-    ]
 
-    # Indicadores de respaldo científico
-    support_indicators = [
-        "estudio", "ensayo clínico",
-        "universidad", "revista científica",
-        "publicado en", "journal",
-        "investigación"
-    ]
+def check_scientific_claims(text: str) -> RuleResult:
 
-    found_claim = False
-    for word in medical_keywords:
-        if word in lower:
-            found_claim = True
-            result.evidence.append(word)
+    result = RuleResult()
 
-    if found_claim:
+    text_lower = text.lower()
 
-        has_support = any(indicator in lower for indicator in support_indicators)
+    claim_matches = []
+
+    for pattern in MEDICAL_KEYWORDS:
+        if re.search(pattern, text_lower):
+            claim_matches.append(pattern)
+
+    if claim_matches:
+
+        has_support = any(indicator in text_lower for indicator in SUPPORT_INDICATORS)
 
         if not has_support:
-            result.points -= 0.6
-            result.reasons.append(
-                "Afirmación médica o científica sin respaldo verificable detectado"
-            )
+
+            result.points += 0.7
+            result.reasons.append("unsupported_scientific_claim")
+            result.evidence.append("Afirmación científica fuerte sin respaldo detectado")
 
     return result

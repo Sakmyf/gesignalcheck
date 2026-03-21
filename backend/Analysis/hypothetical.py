@@ -1,33 +1,31 @@
-class AnalysisResult:
-    def __init__(self):
-        self.points = 0.0
-        self.reasons = []
-        self.evidence = []
+# hypothetical.py
+
+import re
+from backend.Analysis.rules_types import RuleResult
 
 
-def check_hypothetical(text: str):
+HYPOTHETICAL_PATTERNS = [
+    r"habría dicho",
+    r"habría ocurrido",
+    r"según trascendió",
+    r"se comenta que",
+    r"escena imaginada",
+    r"fuentes cercanas",
+    r"todo indicaría",
+    r"aparentemente"
+]
 
-    result = AnalysisResult()
-    lower = text.lower()
 
-    hypothetical_patterns = [
-        "habría dicho",
-        "habría ocurrido",
-        "según trascendió",
-        "se comenta que",
-        "escena imaginada",
-        "fuentes cercanas",
-        "todo indicaría",
-        "aparentemente"
-    ]
+def check_hypothetical(text: str) -> RuleResult:
 
-    matches = [p for p in hypothetical_patterns if p in lower]
+    result = RuleResult()
+    text_lower = text.lower()
+
+    matches = [p for p in HYPOTHETICAL_PATTERNS if re.search(p, text_lower)]
 
     if matches:
-        result.points -= 0.4
-        result.reasons.append(
-            "Contenido narrativo no verificable o hipotético detectado"
-        )
+        result.points += 0.4
+        result.reasons.append("hypothetical_or_unverified_claim")
         result.evidence.extend(matches)
 
     return result

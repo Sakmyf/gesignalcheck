@@ -1,9 +1,12 @@
 {
   "manifest_version": 3,
+
   "name": "SignalCheck",
+
   "version": "0.2.1",
-  "description": "Enterprise contextual analysis engine. Detects structural trust and rhetorical manipulation signals.",
-  
+
+  "description": "Enterprise contextual analysis engine. Detects structural trust and rhetorical manipulation signals. Does not determine truth or falsity.",
+
   "action": {
     "default_popup": "popup.html",
     "default_title": "SignalCheck — Enterprise Contextual Analysis"

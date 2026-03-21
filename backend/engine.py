@@ -1,185 +1,197 @@
-print("ENGINE RULE ENGINE 6.2.1 COGNITIVE PROTECTION ACTIVE")
-print("🔥 ENGINE.PY 6.2.1 ACTIVO")
+# ======================================================
+# SIGNALCHECK ENGINE v11.0 FINAL + UX READY
+# ======================================================
 
-ENGINE_VERSION = "6.2.1"
-ENGINE_MODE = "hybrid_narrative_scientific"
+from backend.modules import (
+    emotions,
+    credibility,
+    misinformation,
+    structural,
+    urgency,
+    promises,
+    polarization,
+    scientific,
+    hypothetical,
+    patterns
+)
 
-from backend.Analysis.emotions import check_emotions
-from backend.Analysis.credibility import check_credibility
-from backend.Analysis.misinformation import check_misinformation
-from backend.Analysis.structural import check_structural
-from backend.Analysis.urgency import check_urgency
-from backend.Analysis.promises import check_promises
-from backend.Analysis.polarization import check_polarization
-from backend.Analysis.scientific_claims import check_scientific_claims
-from backend.Analysis.hypothetical import check_hypothetical
-from urllib.parse import urlparse
+# 🔥 NUEVOS MÓDULOS
+from backend.analysis.evidence import analyze_evidence
+from backend.analysis.authority import analyze_authority
+from backend.analysis.framing import analyze_framing
+from backend.analysis.contradictions import analyze_contradictions
+from backend.analysis.headline_gap import analyze_headline_gap
 
-# ===============================
-# Configuración estratégica
-# ===============================
+# 🔥 CAPAS INTELIGENTES
+from backend.analysis.patterns_engine import detect_patterns
+from backend.analysis.narrative_profile import build_narrative_profile
+from backend.analysis.insight_generator import generate_insight
+from backend.analysis.context_classifier import classify_context
+from backend.analysis.context_adjuster import adjust_signals_by_context
+from backend.analysis.source_analyzer import analyze_source
+from backend.analysis.source_adjuster import adjust_score_by_source
+from backend.analysis.confidence_score import compute_confidence
 
-MAX_QUALITY_SCORE = 4.0
-MAX_RISK_SCORE = 8.0
-
-EMOTION_WEIGHT = 1.6
-POLARIZATION_WEIGHT = 1.7
-URGENCY_WEIGHT = 1.4
-PROMISE_WEIGHT = 1.4
-
-
-def detect_site_type(url: str) -> str:
-    if not url:
-        return "unknown"
-
-    domain = urlparse(url).netloc.lower()
-
-    if any(k in domain for k in [".gob.", ".gov.", ".edu."]):
-        return "institutional"
-
-    if any(k in domain for k in ["clarin", "bbc", "cnn", "reuters"]):
-        return "media"
-
-    if any(k in domain for k in ["facebook", "instagram", "tiktok", "x.com"]):
-        return "social"
-
-    return "blog"
+# 🔥 UTILS
+from backend.utils.analysis_adapter import adapt_dict_to_result
+from backend.utils.text_normalizer import normalize_text
 
 
-def analyze_context(text: str, url: str = ""):
+MAX_RISK_SCORE = 10.0
 
-    site_type = detect_site_type(url)
 
-    emotions = check_emotions(text)
-    credibility = check_credibility(text)
-    misinformation = check_misinformation(text)
-    structural = check_structural(text)
-    urgency = check_urgency(text)
-    promises = check_promises(text)
-    polarization = check_polarization(text)
-    scientific = check_scientific_claims(text)
-    hypothetical = check_hypothetical(text)
+def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""):
+    """
+    Motor principal de análisis SignalCheck – versión final lista para producto
+    """
 
-    # ===============================
-    # QUALITY
-    # ===============================
+    # ======================================================
+    # 🛑 FALLBACK
+    # ======================================================
 
-    quality_points = (
-        max(credibility.points, 0) +
-        max(structural.points, 0)
-    )
+    if not text or len(text.strip()) < 30:
+        return {
+            "risk_score": 0.0,
+            "risk_level": "low",
+            "confidence": 0.2,
+            "insight": "Contenido insuficiente para análisis",
+            "context": "unknown",
+            "source": {},
+            "reasons": [],
+            "signals": [],
+            "patterns": [],
+            "profile": {},
+            "total_modules": 0
+        }
 
-    # ===============================
-    # RISK
-    # ===============================
+    # ======================================================
+    # NORMALIZACIÓN
+    # ======================================================
 
-    risk_points = 0.0
+    text = normalize_text(text)
 
-    risk_points += abs(min(emotions.points * EMOTION_WEIGHT, 0))
-    risk_points += abs(min(polarization.points * POLARIZATION_WEIGHT, 0))
-    risk_points += abs(min(urgency.points * URGENCY_WEIGHT, 0))
-    risk_points += abs(min(promises.points * PROMISE_WEIGHT, 0))
-    risk_points += abs(min(misinformation.points, 0))
-    risk_points += abs(min(scientific.points, 0))
-    risk_points += abs(min(hypothetical.points, 0))
+    # ======================================================
+    # CONTEXTO Y FUENTE
+    # ======================================================
 
-    # ===============================
-    # Bonus manipulación combinada
-    # ===============================
+    context = classify_context(text)
+    source_info = analyze_source(url)
 
-    strong_signals = 0
+    # ======================================================
+    # MÓDULOS BASE
+    # ======================================================
 
-    if emotions.points < -0.7:
-        strong_signals += 1
-    if polarization.points < -0.6:
-        strong_signals += 1
-    if urgency.points < -0.5:
-        strong_signals += 1
+    modules = [
+        emotions.analyze(text),
+        credibility.analyze(text),
+        misinformation.analyze(text),
+        structural.analyze(text),
+        urgency.analyze(text),
+        promises.analyze(text),
+        polarization.analyze(text),
+        scientific.analyze(text),
+        hypothetical.analyze(text),
+        patterns.analyze(text)
+    ]
 
-    if strong_signals >= 2:
-        risk_points += 1.2
+    # ======================================================
+    # NUEVOS MÓDULOS
+    # ======================================================
 
-    # ===============================
-    # Ajuste por tipo de sitio
-    # ===============================
+    evidence = adapt_dict_to_result(analyze_evidence(text), 1.2, "evidence:")
+    authority = adapt_dict_to_result(analyze_authority(text), 0.8, "authority:")
+    framing = adapt_dict_to_result(analyze_framing(text), 1.0, "framing:")
+    contradictions = adapt_dict_to_result(analyze_contradictions(text), 1.5, "contradiction:")
+    headline_gap = adapt_dict_to_result(analyze_headline_gap(headline, body or text), 1.3, "headline:")
 
-    if site_type == "institutional":
-        risk_points *= 0.7
-    elif site_type == "media":
-        risk_points *= 0.9
-    elif site_type == "social":
-        risk_points *= 1.15
+    modules.extend([
+        evidence,
+        authority,
+        framing,
+        contradictions,
+        headline_gap
+    ])
 
-    # ===============================
-    # Normalización
-    # ===============================
+    # ======================================================
+    # SCORE BASE
+    # ======================================================
 
-    quality_score = max(min(quality_points / MAX_QUALITY_SCORE, 1.0), 0.0)
-    risk_score = max(min(risk_points / MAX_RISK_SCORE, 1.0), 0.0)
+    total_points = sum(m.points for m in modules)
+    risk_score = max(min(abs(total_points) / MAX_RISK_SCORE, 1.0), 0.0)
 
-    global_score = (risk_score * 0.75) + ((1 - quality_score) * 0.25)
-    global_score = round(global_score, 4)
+    # ======================================================
+    # REASONS + SIGNALS
+    # ======================================================
 
-    # ===============================
-    # Decisión visual
-    # ===============================
+    all_reasons = list(dict.fromkeys(
+        r for m in modules for r in m.reasons
+    ))
 
-    if global_score < 0.25:
-        status = "green"
-        label = "contenido informativo"
-    elif global_score < 0.55:
-        status = "yellow"
-        label = "requiere lectura crítica"
+    all_signals = list(dict.fromkeys(
+        s for m in modules for s in m.evidence
+    ))
+
+    # ======================================================
+    # AJUSTE POR CONTEXTO
+    # ======================================================
+
+    all_signals = adjust_signals_by_context(all_signals, context)
+
+    # ======================================================
+    # PATTERNS
+    # ======================================================
+
+    patterns_detected = detect_patterns(all_signals, risk_score)
+
+    # ======================================================
+    # PROFILE
+    # ======================================================
+
+    narrative_profile = build_narrative_profile(all_signals, risk_score)
+
+    # ======================================================
+    # AJUSTE POR FUENTE
+    # ======================================================
+
+    risk_score = adjust_score_by_source(risk_score, source_info)
+
+    # ======================================================
+    # INSIGHT (UX CLAVE)
+    # ======================================================
+
+    insight = generate_insight(patterns_detected, narrative_profile)
+
+    # ======================================================
+    # CONFIDENCE
+    # ======================================================
+
+    confidence = compute_confidence(all_signals, patterns_detected)
+
+    # ======================================================
+    # NIVEL FINAL
+    # ======================================================
+
+    if risk_score < 0.3:
+        level = "low"
+    elif risk_score < 0.6:
+        level = "medium"
     else:
-        status = "red"
-        label = "presión narrativa significativa"
+        level = "high"
 
-    # ===============================
-    # Recolección de señales
-    # ===============================
-
-    all_reasons = (
-        emotions.reasons +
-        credibility.reasons +
-        misinformation.reasons +
-        structural.reasons +
-        urgency.reasons +
-        promises.reasons +
-        polarization.reasons +
-        scientific.reasons +
-        hypothetical.reasons
-    )
-
-    all_evidence = (
-        emotions.evidence +
-        credibility.evidence +
-        misinformation.evidence +
-        structural.evidence +
-        urgency.evidence +
-        promises.evidence +
-        polarization.evidence +
-        scientific.evidence +
-        hypothetical.evidence
-    )
+    # ======================================================
+    # OUTPUT FINAL (READY FOR UI)
+    # ======================================================
 
     return {
-        "engine_version": ENGINE_VERSION,
-        "engine_mode": ENGINE_MODE,
-        "status": status,
-        "label": label,
-        "score": round(global_score, 2),
-        "quality_score": round(quality_score, 2),
-        "risk_score": round(risk_score, 2),
-        "site_type": site_type,
-        "signals": all_evidence,
-        "reasons": all_reasons,
+        "risk_score": round(risk_score, 3),
+        "risk_level": level,
+        "confidence": round(confidence, 3),
+        "insight": insight,
+        "context": context,
+        "source": source_info,
+        "reasons": all_reasons[:5],   # FREE LIMIT
+        "signals": all_signals,
+        "patterns": patterns_detected,
+        "profile": narrative_profile,
+        "total_modules": len(modules)
     }
-
-
-def interpret_score(score: float):
-    if score < 0.25:
-        return "green", "bajo"
-    elif score < 0.55:
-        return "yellow", "medio"
-    else:
-        return "red", "alto"

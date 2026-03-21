@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>SignalCheck</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- HEADER -->
+    <div class="header">
+      <h1>SignalCheck</h1>
+      <div class="subtitle">Análisis estructural del contenido</div>
+    </div>
+
+    <!-- BADGE -->
+    <div id="labelBadge" class="signal-label">Analizando...</div>
+
+    <!-- LOADER -->
+    <div class="loader" id="loader"></div>
+
+    <!-- RESUMEN -->
+    <div id="summary" class="hidden"></div>
+
+    <!-- CONTEXT NOTE (PRO) -->
+    <div id="contextNote" class="context-note hidden"></div>
+
+    <!-- SEÑALES -->
+    <ul id="signalsList" class="hidden"></ul>
+
+    <!-- SCORE (PRO) -->
+    <div id="scoreContainer" class="score hidden">
+      Índice estructural: <span id="scoreValue">0.00</span>
+    </div>
+
+    <!-- ERROR -->
+    <div id="error"></div>
+
+    <!-- BOTÓN -->
+    <button id="analyzeBtn">Analizar página</button>
+
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

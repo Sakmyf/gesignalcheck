@@ -1,22 +1,22 @@
-print("APP FILE ACTUAL 11.4 - dashboard HTML enabled - stable")
+print("APP FILE ACTUAL 11.8 - error safe mode activo")
 
 # ==========================================================
 # IMPORTS
 # ==========================================================
 
 import os
+from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, Header, Depends, Request
+from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from urllib.parse import urlparse
 
 from backend.database import engine, get_db
 from backend.models import Base, Extension, AnalysisLog
-from backend.engine import analyze_context, interpret_score
+from backend.engine import analyze_context
+from backend.final_adjustment import apply_context_adjustment, build_summary
 from backend.utils.content_versioning import (
     generate_content_hash,
     build_analysis_key,
@@ -26,15 +26,9 @@ from backend.utils.content_versioning import (
 # VERSION CONTROL
 # ==========================================================
 
-ENGINE_VERSION = "v8.5"
+API_VERSION = "v3"
+ENGINE_VERSION = "v8.6"
 PROMPT_VERSION = "none"
-
-# ==========================================================
-# KEYS — desde variables de entorno
-# ==========================================================
-
-PRIVATE_KEY = os.environ.get("PRIVATE_KEY", "").replace("\\n", "\n")
-PUBLIC_KEY = os.environ.get("PUBLIC_KEY", "").replace("\\n", "\n")
 
 # ==========================================================
 # FASTAPI INIT
@@ -46,26 +40,13 @@ app = FastAPI(title="GE SignalCheck API v8 - Stable")
 # CORS
 # ==========================================================
 
-_env = os.environ.get("ENV_MODE", "production")
-_origins_raw = os.environ.get("ALLOWED_ORIGINS", "")
-_origins_list = [o.strip() for o in _origins_raw.split(",") if o.strip()]
-
-if _env == "development":
-    _origins_list += ["http://localhost", "http://localhost:3000"]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_origins_list,
+    allow_origins=["*"],  # 🔥 para desarrollo (clave)
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "x-extension-id"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-
-# ==========================================================
-# TEMPLATES CONFIG
-# ==========================================================
-
-templates = Jinja2Templates(directory="../templates")
 
 # ==========================================================
 # DB INIT
@@ -92,14 +73,6 @@ def root():
     return {"status": "GE SignalCheck API online"}
 
 # ==========================================================
-# HEALTH
-# ==========================================================
-
-@app.get("/health")
-def health():
-    return {"status": "ok", "engine_version": ENGINE_VERSION}
-
-# ==========================================================
 # VERIFY ENDPOINT
 # ==========================================================
 
@@ -117,22 +90,27 @@ async def verify(
         Extension.extension_id == x_extension_id.strip()
     ).first()
 
+    # AUTO REGISTRO
     if not extension:
-        raise HTTPException(status_code=401, detail="Extensión no registrada")
+        extension = Extension(
+            extension_id=x_extension_id.strip(),
+            is_active=True,
+            plan="free",
+            analyses_used=0,
+            analyses_limit=0
+        )
+        db.add(extension)
+        db.commit()
+        db.refresh(extension)
 
     if not extension.is_active:
         raise HTTPException(status_code=403, detail="Extensión desactivada")
-
-    if extension.analyses_limit > 0 and extension.analyses_used >= extension.analyses_limit:
-        raise HTTPException(status_code=403, detail="Límite de uso alcanzado")
-
-    plan_normalized = extension.plan.lower()
 
     if not data.text or len(data.text.strip()) < 30:
         raise HTTPException(status_code=400, detail="Texto insuficiente")
 
     text = data.text
-    url = data.url or ""
+    url  = data.url or ""
 
     content_hash = generate_content_hash(text)
 
@@ -143,40 +121,43 @@ async def verify(
         prompt_version=PROMPT_VERSION
     )
 
-    existing_log = (
-        db.query(AnalysisLog)
-        .filter(AnalysisLog.analysis_key == analysis_key)
-        .first()
-    )
+    # ==========================================================
+    # 🔥 BLOQUE PROTEGIDO (CLAVE)
+    # ==========================================================
 
-    if existing_log:
-        return {
-            "analysis": {
-                "level": existing_log.level,
-                "summary": "Resultado recuperado desde cache.",
-                "indicators": [],
-                "shown_indicators": 0,
-                "note": "Este análisis ya había sido procesado anteriormente.",
-                "structural_index": existing_log.risk_index
-            },
-            "meta": {
-                "engine_version": existing_log.engine_version,
-                "analysis_key": analysis_key,
-                "cached": True,
-                "premium_available": True,
-                "plan": plan_normalized,
-                "disclaimer": "SignalCheck no determina veracidad."
-            }
+    try:
+        result = analyze_context(text, url)
+
+        result = apply_context_adjustment(result)
+        summary = build_summary(result)
+
+        status_color = result.get("status", "neutral")
+        level = result.get("label", "indeterminado")
+
+    except Exception as e:
+        print("🔥 ERROR EN ANALISIS:", str(e))
+
+        result = {
+            "score": 0,
+            "signals": [],
+            "status": "neutral",
+            "label": "error",
+            "context_note": "No se pudo analizar el contenido"
         }
 
-    result = analyze_context(text, url)
-    status_color, level = interpret_score(result.get("score", 0))
+        summary = "No se pudo completar el análisis."
+        status_color = "neutral"
+        level = "error"
+
+    # ==========================================================
+    # GUARDADO
+    # ==========================================================
 
     parsed = urlparse(url)
-    site_type = parsed.netloc if parsed.netloc else "unknown"
+    domain = parsed.netloc if parsed.netloc else "unknown"
 
     analysis_log = AnalysisLog(
-        trust_score=result.get("quality_score", 0),
+        trust_score=result.get("score", 0),
         rhetorical_score=0,
         narrative_score=0,
         absence_score=0,
@@ -184,7 +165,9 @@ async def verify(
         level=level,
         premium_requested=False,
         engine_version=ENGINE_VERSION,
-        analysis_key=analysis_key
+        analysis_key=analysis_key,
+        domain=domain,
+        created_at=datetime.utcnow()
     )
 
     db.add(analysis_log)
@@ -194,7 +177,7 @@ async def verify(
     indicators = [
         {
             "title": s,
-            "explanation": "Señal estructural detectada durante el análisis contextual.",
+            "explanation": "Señal estructural detectada",
             "orientation": "alerta" if status_color != "green" else "neutro"
         }
         for s in result.get("signals", [])[:5]
@@ -203,20 +186,17 @@ async def verify(
     return {
         "analysis": {
             "level": level,
-            "summary": result.get("label"),
+            "summary": summary,
             "indicators": indicators,
             "shown_indicators": len(indicators),
-            "note": "Se muestran las señales estructurales más relevantes.",
-            "structural_index": result.get("score", 0)
+            "structural_index": result.get("score", 0),
+            "context_note": result.get("context_note", "")
         },
         "meta": {
             "engine_version": ENGINE_VERSION,
-            "site_type": site_type,
-            "content_hash": content_hash,
             "analysis_key": analysis_key,
             "cached": False,
-            "premium_available": True,
-            "plan": plan_normalized,
+            "plan": extension.plan,
             "disclaimer": "SignalCheck no determina veracidad."
         }
     }

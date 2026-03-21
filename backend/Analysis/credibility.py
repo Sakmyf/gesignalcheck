@@ -1,5 +1,5 @@
-﻿
-# credibility.py
+﻿# credibility.py
+
 import re
 from backend.Analysis.rules_types import RuleResult
 
@@ -15,9 +15,9 @@ SOURCE_PATTERNS = [
 ]
 
 DATA_PATTERNS = [
-    r"\d+%",          # porcentaje
-    r"\d{4}",         # años
-    r"\d+\.\d+",      # decimales
+    r"\d+%",       # porcentaje
+    r"\d{4}",      # años
+    r"\d+\.\d+",   # decimales
 ]
 
 OPINION_PATTERNS = [
@@ -31,25 +31,22 @@ OPINION_PATTERNS = [
 def check_credibility(text: str) -> RuleResult:
 
     result = RuleResult()
+    text_lower = text.lower()
 
-    has_source = any(re.search(p, text, re.I) for p in SOURCE_PATTERNS)
-    has_data = any(re.search(p, text, re.I) for p in DATA_PATTERNS)
-    has_opinion = any(re.search(p, text, re.I) for p in OPINION_PATTERNS)
+    has_source = any(re.search(p, text_lower) for p in SOURCE_PATTERNS)
+    has_data = any(re.search(p, text_lower) for p in DATA_PATTERNS)
+    has_opinion = any(re.search(p, text_lower) for p in OPINION_PATTERNS)
 
     # 🔴 Opinión fuerte sin respaldo
     if has_opinion and not has_source and not has_data:
-        result.points += 1.0
+        result.points += 0.9
         result.reasons.append("low_credibility_opinion")
-        result.evidence.append("Opinión fuerte sin fuentes ni datos verificables")
+        result.evidence.append("Opinión fuerte sin fuentes ni datos")
 
     # 🟠 Sin fuentes detectadas
-    if not has_source:
-        result.points += 0.6
+    elif not has_source:
+        result.points += 0.5
         result.reasons.append("no_detected_source")
         result.evidence.append("No se detectaron fuentes claras")
-
-    # 🟢 Si hay datos concretos, reduce ligeramente riesgo
-    if has_data:
-        result.points -= 0.4
 
     return result

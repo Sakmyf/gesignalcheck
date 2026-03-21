@@ -1,6 +1,8 @@
 # polarization.py
+
 import re
-from .rules_types import RuleResult
+from backend.Analysis.rules_types import RuleResult
+
 
 POLARIZATION_PATTERNS = [
     r"ellos contra nosotros",
@@ -13,6 +15,7 @@ POLARIZATION_PATTERNS = [
     r"no les importa la gente",
 ]
 
+
 GENERALIZATION_PATTERNS = [
     r"\btodos\b",
     r"\bnadie\b",
@@ -20,42 +23,36 @@ GENERALIZATION_PATTERNS = [
     r"\bnunca\b",
 ]
 
+
 def check_polarization(text: str) -> RuleResult:
+
+    result = RuleResult()
+
+    text_lower = text.lower()
 
     matches = 0
 
-    for p in POLARIZATION_PATTERNS:
-        if re.search(p, text, re.I):
+    for pattern in POLARIZATION_PATTERNS:
+        if re.search(pattern, text_lower):
             matches += 1
+            result.evidence.append(f"Patrón polarizante detectado: {pattern}")
 
-    generalizations = 0
-    for g in GENERALIZATION_PATTERNS:
-        generalizations += len(re.findall(g, text, re.I))
-
-    score = 0.0
-    reasons = []
-    evidence = []
+    generalizations = sum(len(re.findall(g, text_lower)) for g in GENERALIZATION_PATTERNS)
 
     # Polarización leve
     if matches == 1:
-        score = -0.1
-        reasons.append("polarization_detected")
-        evidence.append("Lenguaje polarizante leve")
+        result.points += 0.4
+        result.reasons.append("polarization_detected")
 
     # Polarización fuerte
     elif matches >= 2:
-        score = -0.25
-        reasons.append("strong_polarization")
-        evidence.append("Narrativa de confrontación reiterada")
+        result.points += 0.8
+        result.reasons.append("strong_polarization")
 
     # Generalizaciones absolutas reiteradas
     if generalizations >= 3:
-        score -= 0.1
-        reasons.append("absolute_generalizations")
-        evidence.append("Uso reiterado de generalizaciones absolutas")
+        result.points += 0.4
+        result.reasons.append("absolute_generalizations")
+        result.evidence.append("Uso reiterado de generalizaciones absolutas")
 
-    return RuleResult(
-        points=score,
-        reasons=reasons,
-        evidence=evidence
-    )
+    return result
