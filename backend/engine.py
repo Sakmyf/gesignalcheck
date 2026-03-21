@@ -1,9 +1,14 @@
-print("🔥 ENGINE v8.7 REAL OK")
 # ======================================================
-# SIGNALCHECK ENGINE v11.0 FINAL + UX READY
+# SIGNALCHECK ENGINE v8.7 — FIXED IMPORTS REAL STRUCTURE
 # ======================================================
 
-from backend.modules import (
+print("🔥 ENGINE v8.7 REAL OK")
+
+# ======================================================
+# IMPORTS CORRECTOS (SEGÚN TU ESTRUCTURA REAL)
+# ======================================================
+
+from backend.Analysis import (
     emotions,
     credibility,
     misinformation,
@@ -11,44 +16,44 @@ from backend.modules import (
     urgency,
     promises,
     polarization,
-    scientific,
+    scientific_claims as scientific,
     hypothetical,
-    patterns
+    narrative_patterns as patterns
 )
 
 # 🔥 NUEVOS MÓDULOS
-from backend.analysis.evidence import analyze_evidence
-from backend.analysis.authority import analyze_authority
-from backend.analysis.framing import analyze_framing
-from backend.analysis.contradictions import analyze_contradictions
-from backend.analysis.headline_gap import analyze_headline_gap
+from backend.Analysis.evidence import analyze_evidence
+from backend.Analysis.authority import analyze_authority
+from backend.Analysis.framing import analyze_framing
+from backend.Analysis.contradictions import analyze_contradictions
+from backend.Analysis.headline_gap import analyze_headline_gap
 
 # 🔥 CAPAS INTELIGENTES
-from backend.analysis.patterns_engine import detect_patterns
-from backend.analysis.narrative_profile import build_narrative_profile
-from backend.analysis.insight_generator import generate_insight
-from backend.analysis.context_classifier import classify_context
-from backend.analysis.context_adjuster import adjust_signals_by_context
-from backend.analysis.source_analyzer import analyze_source
-from backend.analysis.source_adjuster import adjust_score_by_source
-from backend.analysis.confidence_score import compute_confidence
+from backend.Analysis.patterns_engine import detect_patterns
+from backend.Analysis.narrative_profile import build_narrative_profile
+from backend.context_classifier import classify_context
+from backend.context_adjuster import adjust_signals_by_context
+from backend.source_analyzer import analyze_source
+from backend.source_adjuster import adjust_score_by_source
+from backend.confidence_score import compute_confidence
 
 # 🔥 UTILS
 from backend.utils.analysis_adapter import adapt_dict_to_result
-from backend.utils.text_normalizer import normalize_text
+from backend.text_normalizer import normalize_text
 
 
 MAX_RISK_SCORE = 10.0
 
 
-def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""):
-    """
-    Motor principal de análisis SignalCheck – versión final lista para producto
-    """
+# ======================================================
+# MAIN FUNCTION
+# ======================================================
 
-    # ======================================================
-    # 🛑 FALLBACK
-    # ======================================================
+def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""):
+
+    # --------------------------------------------------
+    # FALLBACK
+    # --------------------------------------------------
 
     if not text or len(text.strip()) < 30:
         return {
@@ -65,22 +70,22 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
             "total_modules": 0
         }
 
-    # ======================================================
+    # --------------------------------------------------
     # NORMALIZACIÓN
-    # ======================================================
+    # --------------------------------------------------
 
     text = normalize_text(text)
 
-    # ======================================================
-    # CONTEXTO Y FUENTE
-    # ======================================================
+    # --------------------------------------------------
+    # CONTEXTO + FUENTE
+    # --------------------------------------------------
 
     context = classify_context(text)
     source_info = analyze_source(url)
 
-    # ======================================================
+    # --------------------------------------------------
     # MÓDULOS BASE
-    # ======================================================
+    # --------------------------------------------------
 
     modules = [
         emotions.analyze(text),
@@ -95,15 +100,15 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
         patterns.analyze(text)
     ]
 
-    # ======================================================
-    # NUEVOS MÓDULOS
-    # ======================================================
+    # --------------------------------------------------
+    # MÓDULOS AVANZADOS
+    # --------------------------------------------------
 
-    evidence = adapt_dict_to_result(analyze_evidence(text), 1.2, "evidence:")
+    evidence = adapt_dict_to_result(analyze_evidence(text), 1.8, "evidence:")
     authority = adapt_dict_to_result(analyze_authority(text), 0.8, "authority:")
-    framing = adapt_dict_to_result(analyze_framing(text), 1.0, "framing:")
-    contradictions = adapt_dict_to_result(analyze_contradictions(text), 1.5, "contradiction:")
-    headline_gap = adapt_dict_to_result(analyze_headline_gap(headline, body or text), 1.3, "headline:")
+    framing = adapt_dict_to_result(analyze_framing(text), 1.2, "framing:")
+    contradictions = adapt_dict_to_result(analyze_contradictions(text), 2.2, "contradiction:")
+    headline_gap = adapt_dict_to_result(analyze_headline_gap(headline, body or text), 1.6, "headline:")
 
     modules.extend([
         evidence,
@@ -113,16 +118,34 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
         headline_gap
     ])
 
-    # ======================================================
+    # --------------------------------------------------
     # SCORE BASE
-    # ======================================================
+    # --------------------------------------------------
 
     total_points = sum(m.points for m in modules)
     risk_score = max(min(abs(total_points) / MAX_RISK_SCORE, 1.0), 0.0)
 
-    # ======================================================
+    # --------------------------------------------------
+    # BOOST INTELIGENTE
+    # --------------------------------------------------
+
+    if contradictions.points > 0.4:
+        risk_score += 0.25
+
+    if evidence.points < 0.3:
+        risk_score += 0.2
+
+    if headline_gap.points > 0.4:
+        risk_score += 0.2
+
+    if framing.points > 0.5:
+        risk_score += 0.15
+
+    risk_score = min(risk_score, 1.0)
+
+    # --------------------------------------------------
     # REASONS + SIGNALS
-    # ======================================================
+    # --------------------------------------------------
 
     all_reasons = list(dict.fromkeys(
         r for m in modules for r in m.reasons
@@ -132,45 +155,50 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
         s for m in modules for s in m.evidence
     ))
 
-    # ======================================================
-    # AJUSTE POR CONTEXTO
-    # ======================================================
+    # --------------------------------------------------
+    # AJUSTE CONTEXTO
+    # --------------------------------------------------
 
     all_signals = adjust_signals_by_context(all_signals, context)
 
-    # ======================================================
+    # --------------------------------------------------
     # PATTERNS
-    # ======================================================
+    # --------------------------------------------------
 
     patterns_detected = detect_patterns(all_signals, risk_score)
 
-    # ======================================================
+    # --------------------------------------------------
     # PROFILE
-    # ======================================================
+    # --------------------------------------------------
 
     narrative_profile = build_narrative_profile(all_signals, risk_score)
 
-    # ======================================================
+    # --------------------------------------------------
     # AJUSTE POR FUENTE
-    # ======================================================
+    # --------------------------------------------------
 
     risk_score = adjust_score_by_source(risk_score, source_info)
 
-    # ======================================================
-    # INSIGHT (UX CLAVE)
-    # ======================================================
+    # --------------------------------------------------
+    # INSIGHT
+    # --------------------------------------------------
 
-    insight = generate_insight(patterns_detected, narrative_profile)
+    if risk_score < 0.3:
+        insight = "contenido informativo"
+    elif risk_score < 0.6:
+        insight = "requiere lectura crítica"
+    else:
+        insight = "contenido con señales de presión narrativa"
 
-    # ======================================================
+    # --------------------------------------------------
     # CONFIDENCE
-    # ======================================================
+    # --------------------------------------------------
 
     confidence = compute_confidence(all_signals, patterns_detected)
 
-    # ======================================================
+    # --------------------------------------------------
     # NIVEL FINAL
-    # ======================================================
+    # --------------------------------------------------
 
     if risk_score < 0.3:
         level = "low"
@@ -179,9 +207,9 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
     else:
         level = "high"
 
-    # ======================================================
-    # OUTPUT FINAL (READY FOR UI)
-    # ======================================================
+    # --------------------------------------------------
+    # OUTPUT
+    # --------------------------------------------------
 
     return {
         "risk_score": round(risk_score, 3),
@@ -190,7 +218,7 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
         "insight": insight,
         "context": context,
         "source": source_info,
-        "reasons": all_reasons[:5],   # FREE LIMIT
+        "reasons": all_reasons[:5],
         "signals": all_signals,
         "patterns": patterns_detected,
         "profile": narrative_profile,
