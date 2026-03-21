@@ -1,52 +1,51 @@
-# enginecontext_ai.py
+# ======================================================
+# SIGNALCHECK — CONTEXT AI (READY FOR INTEGRATION)
+# ======================================================
 
-def analyze_context(url: str, text: str) -> dict:
+def analyze_context_ai(url: str, text: str) -> dict:
     """
-    Analiza contexto informativo usando IA.
-    NO decide verdad/falsedad.
-    SOLO evalúa señales contextuales.
+    Análisis contextual (IA opcional).
+    No determina verdad.
+    Evalúa contexto interpretativo.
     """
+
+    if not text:
+        return {
+            "page_type": "unknown",
+            "tone": "neutral",
+            "intent": "inform",
+            "risk_level": "low",
+            "notes": "sin contenido"
+        }
+
+    # --------------------------------------------------
+    # PROMPT (para uso futuro con LLM)
+    # --------------------------------------------------
 
     prompt = f"""
-Actuás como un analista de contexto informativo, NO como verificador de hechos.
+Actuás como un analista de contexto informativo.
 
-Objetivo:
-Detectar señales de contexto que puedan influir en la interpretación del contenido.
-
-REGLAS ESTRICTAS:
-- NO clasifiques como falso contenido legítimo.
-- NO penalices medios reconocidos solo por estilo periodístico.
-- El rojo solo corresponde a estafas, manipulación o contradicción explícita.
-- El amarillo es el estado por defecto si hay duda.
-- El verde se usa cuando el contenido es informativo, institucional o neutral.
-
-Evaluá SOLO estas dimensiones:
-1. Tipo de fuente (institucional, comercial, periodística, social)
-2. Tono (neutral, emocional, alarmista, promocional)
-3. Intención aparente (informar, persuadir, vender, asustar)
-4. Riesgo de mala interpretación por lector promedio
-
-DEVOLVÉ EXCLUSIVAMENTE ESTE JSON:
-{{
-  "page_type": "news | ecommerce | institutional | social | unknown",
-  "tone": "neutral | emotional | alarmist | promotional",
-  "intent": "inform | persuade | sell | warn",
-  "risk_level": "low | medium | high",
-  "notes": "breve explicación humana"
-}}
+Evaluá:
+- tipo de fuente
+- tono
+- intención
+- riesgo interpretativo
 
 URL:
 {url}
 
 CONTENIDO:
-{text[:4000]}
+{text[:3000]}
 """
 
-    # ⚠️ placeholder: acá luego conectás OpenAI / LLM real
+    # --------------------------------------------------
+    # PLACEHOLDER ACTUAL (SIN IA)
+    # --------------------------------------------------
+
     return {
-        "page_type": "news",
+        "page_type": "unknown",
         "tone": "neutral",
         "intent": "inform",
-        "risk_level": "low",
-        "notes": "Contenido informativo sin señales de manipulación."
+        "risk_level": "medium",
+        "notes": "análisis contextual no activado (modo heurístico)"
     }

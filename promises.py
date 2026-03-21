@@ -1,14 +1,23 @@
-# promises.py
+# ======================================================
+# SIGNALCHECK — PROMISES MODULE (ADAPTADO v8.7)
+# ======================================================
+
 import re
-from rules_types import RuleResult
+from backend.Analysis.base import AnalysisResult
+
 
 PROMISES = r"(ganancia segura|sin riesgo|100% garantizado)"
 
-def check_promises(text: str) -> RuleResult:
-    if re.search(PROMISES, text, re.I):
-        return RuleResult(
-            points=-0.4,
-            reasons=["exaggerated_promises"],
-            evidence=["Promesas irreales o garantizadas"]
-        )
-    return RuleResult()
+
+def analyze(text: str) -> AnalysisResult:
+
+    result = AnalysisResult()
+
+    matches = re.findall(PROMISES, text, re.I)
+
+    if matches:
+        result.points -= 0.4
+        result.reasons.append("promesas exageradas o irreales")
+        result.evidence.extend(matches)
+
+    return result

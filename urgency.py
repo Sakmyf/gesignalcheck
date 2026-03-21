@@ -1,14 +1,23 @@
-# urgency.py
+# ======================================================
+# SIGNALCHECK — URGENCY MODULE (ADAPTADO v8.7)
+# ======================================================
+
 import re
-from rules_types import RuleResult
+from backend.Analysis.base import AnalysisResult
+
 
 URGENCY_PATTERNS = r"(urgente|última oportunidad|actuá ahora|inmediato)"
 
-def check_urgency(text: str) -> RuleResult:
-    if re.search(URGENCY_PATTERNS, text, re.I):
-        return RuleResult(
-            points=-0.3,
-            reasons=["urgency_pressure"],
-            evidence=["Lenguaje de urgencia detectado"]
-        )
-    return RuleResult()
+
+def analyze(text: str) -> AnalysisResult:
+
+    result = AnalysisResult()
+
+    matches = re.findall(URGENCY_PATTERNS, text, re.I)
+
+    if matches:
+        result.points -= 0.3
+        result.reasons.append("presión de urgencia")
+        result.evidence.extend(matches)
+
+    return result

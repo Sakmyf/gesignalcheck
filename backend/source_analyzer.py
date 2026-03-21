@@ -1,71 +1,78 @@
 # ======================================================
-# SIGNALCHECK – SOURCE ANALYZER v1.0
-# Evalúa la confiabilidad de la fuente (no el contenido)
+# SOURCE ANALYZER — ENGINE v8.7 COMPATIBLE
 # ======================================================
 
+from backend.domain_reputation import calculate_domain_score
+
+
 KNOWN_MEDIA = [
-    "nytimes.com",
-    "bbc.com",
-    "cnn.com",
-    "reuters.com",
-    "theguardian.com",
-    "infobae.com",
     "clarin.com",
     "lanacion.com.ar",
-    "pagina12.com.ar"
+    "infobae.com",
+    "iprofesional.com"
 ]
 
 LOW_QUALITY_PATTERNS = [
-    "blogspot",
-    "wordpress",
-    "noticias-24",
+    ".xyz",
+    ".click",
+    ".top",
     "viral",
-    "alerta",
-    "secreto"
+    "shocking",
+    "increible"
 ]
 
 
 def analyze_source(url: str):
-    """
-    Analiza la fuente del contenido
-    """
 
     if not url:
         return {
+            "domain": "",
+            "score": 0,
+            "signals": ["sin información de fuente"],
             "trust_level": 0.5,
-            "type": "unknown",
-            "reason": "sin información de fuente"
+            "type": "unknown"
         }
 
     u = url.lower()
+
+    # --------------------------------------------------
+    # BASE: DOMAIN REPUTATION
+    # --------------------------------------------------
+    domain_data = calculate_domain_score(url)
+
+    trust_level = 0.6
+    source_type = "generic"
+    reason = "fuente no categorizada"
 
     # --------------------------------------------------
     # MEDIO CONOCIDO
     # --------------------------------------------------
     for domain in KNOWN_MEDIA:
         if domain in u:
-            return {
-                "trust_level": 0.85,
-                "type": "recognized_media",
-                "reason": "medio reconocido"
-            }
+            trust_level = 0.85
+            source_type = "recognized_media"
+            reason = "medio reconocido"
+            break
 
     # --------------------------------------------------
     # DOMINIOS SOSPECHOSOS
     # --------------------------------------------------
     for pattern in LOW_QUALITY_PATTERNS:
         if pattern in u:
-            return {
-                "trust_level": 0.3,
-                "type": "low_quality",
-                "reason": "dominio de baja calidad o viral"
-            }
+            trust_level = 0.3
+            source_type = "low_quality"
+            reason = "dominio de baja calidad"
+            break
 
     # --------------------------------------------------
-    # DEFAULT
+    # OUTPUT FINAL COMPATIBLE ENGINE
     # --------------------------------------------------
     return {
-        "trust_level": 0.6,
-        "type": "generic",
-        "reason": "fuente no categorizada"
+        "domain": domain_data.get("domain", ""),
+        "score": domain_data.get("score", 0),
+        "signals": domain_data.get("signals_positive", []) +
+                   domain_data.get("signals_negative", []) +
+                   [reason],
+        "trust_level": trust_level,
+        "type": source_type
     }

@@ -1,6 +1,10 @@
-# emotions.py
+# ======================================================
+# SIGNALCHECK — EMOTIONS MODULE (ADAPTADO v8.7)
+# ======================================================
+
 import re
-from rules_types import RuleResult
+from backend.Analysis.base import AnalysisResult
+
 
 EMOTION_PATTERNS = [
     r"cansado de",
@@ -10,12 +14,21 @@ EMOTION_PATTERNS = [
     r"viví como soñás",
 ]
 
-def check_emotions(text: str) -> RuleResult:
+
+def analyze(text: str) -> AnalysisResult:
+
+    result = AnalysisResult()
+
+    matches = []
+
     for p in EMOTION_PATTERNS:
-        if re.search(p, text, re.I):
-            return RuleResult(
-                points=-0.15,
-                reasons=["emotional_manipulation"],
-                evidence=["Lenguaje emocional persuasivo"]
-            )
-    return RuleResult()
+        found = re.findall(p, text, re.I)
+        if found:
+            matches.extend(found)
+
+    if matches:
+        result.points -= 0.15
+        result.reasons.append("manipulación emocional")
+        result.evidence.extend(matches)
+
+    return result
