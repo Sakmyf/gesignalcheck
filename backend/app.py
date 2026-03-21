@@ -165,8 +165,7 @@ async def verify(
         level=level,
         premium_requested=False,
         engine_version=ENGINE_VERSION,
-        analysis_key=analysis_key,
-        created_at=datetime.utcnow()
+        analysis_key=analysis_key
     )
 
     db.add(analysis_log)
