@@ -22,6 +22,9 @@ def check_structural(text: str) -> RuleResult:
 
     text_lower = text.lower()
 
+def analyze(text: str):
+    return check_structural(text)
+
     # 🔴 Generalizaciones absolutas repetidas
     absolute_count = sum(len(re.findall(p, text_lower)) for p in ABSOLUTES)
 
@@ -52,3 +55,4 @@ def check_structural(text: str) -> RuleResult:
         result.evidence.append("Uso reiterado de exclamaciones")
 
     return result
+

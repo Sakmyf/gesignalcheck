@@ -1,5 +1,3 @@
-# hypothetical.py
-
 import re
 from backend.Analysis.rules_types import RuleResult
 
@@ -29,3 +27,7 @@ def check_hypothetical(text: str) -> RuleResult:
         result.evidence.extend(matches)
 
     return result
+
+
+def analyze(text: str):
+    return check_hypothetical(text)

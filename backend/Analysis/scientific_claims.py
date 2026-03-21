@@ -33,6 +33,9 @@ def check_scientific_claims(text: str) -> RuleResult:
 
     claim_matches = []
 
+def analyze(text: str):
+    return check_scientific_claims(text)
+
     for pattern in MEDICAL_KEYWORDS:
         if re.search(pattern, text_lower):
             claim_matches.append(pattern)

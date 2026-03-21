@@ -22,6 +22,9 @@ def check_promises(text: str) -> RuleResult:
 
         if re.search(pattern, text_lower):
 
+def analyze(text: str):
+    return check_promises(text)
+
             result.points += 0.8
             result.reasons.append("exaggerated_promises")
             result.evidence.append(f"Promesa absoluta detectada: {pattern}")

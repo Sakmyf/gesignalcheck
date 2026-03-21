@@ -18,6 +18,9 @@ def check_urgency(text: str) -> RuleResult:
 
     matches = 0
 
+def analyze(text: str):
+    return check_urgency(text)
+
     for pattern in URGENCY_PATTERNS:
         if re.search(pattern, text):
             matches += 1

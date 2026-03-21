@@ -1,6 +1,4 @@
-﻿# misinformation.py
-
-import re
+﻿import re
 from backend.Analysis.rules_types import RuleResult
 
 
@@ -44,14 +42,11 @@ ATTRIBUTION_PATTERNS = [
 def check_misinformation(text: str) -> RuleResult:
 
     result = RuleResult()
-
     text_lower = text.lower()
 
-    # 🔴 Acusaciones graves sin atribución
     serious_found = [c for c in SERIOUS_CLAIMS if re.search(c, text_lower)]
 
     if serious_found:
-
         has_source = any(re.search(a, text_lower) for a in ATTRIBUTION_PATTERNS)
 
         if not has_source:
@@ -61,7 +56,6 @@ def check_misinformation(text: str) -> RuleResult:
                 f"Acusación grave sin fuente: {', '.join(serious_found)}"
             )
 
-    # 🟠 Lenguaje conspirativo
     conspiracies = [p for p in CONSPIRACY_PATTERNS if re.search(p, text_lower)]
 
     if conspiracies:
@@ -69,7 +63,6 @@ def check_misinformation(text: str) -> RuleResult:
         result.reasons.append("conspiracy_language")
         result.evidence.append("Lenguaje conspirativo detectado")
 
-    # 🟡 Afirmaciones categóricas fuertes
     categorical = [p for p in CATEGORICAL_PATTERNS if re.search(p, text_lower)]
 
     if categorical:
@@ -78,3 +71,7 @@ def check_misinformation(text: str) -> RuleResult:
         result.evidence.append("Afirmación categórica fuerte")
 
     return result
+
+
+def analyze(text: str):
+    return check_misinformation(text)
