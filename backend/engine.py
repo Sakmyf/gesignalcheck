@@ -1,11 +1,11 @@
 # ======================================================
-# SIGNALCHECK ENGINE v8.7 — CLEAN STABLE (NO MODULES)
+# SIGNALCHECK ENGINE v8.7 — CLEAN STABLE (FIXED)
 # ======================================================
 
 print("🔥 ENGINE v8.7 REAL OK")
 
 # ======================================================
-# IMPORTS REALES (tu estructura actual)
+# IMPORTS REALES
 # ======================================================
 
 from backend.Analysis import (
@@ -71,6 +71,10 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
     context = classify_context(text)
     source_info = analyze_source(url)
 
+    # ======================================================
+    # MÓDULOS LEGACY (OK)
+    # ======================================================
+
     modules = [
         emotions.analyze(text),
         credibility.analyze(text),
@@ -81,22 +85,35 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
         polarization.analyze(text),
         scientific.analyze(text),
         hypothetical.analyze(text),
-        patterns.analyze(text)
     ]
 
-    # NUEVOS
-    evidence = adapt_dict_to_result(analyze_evidence(text), 1.8, "evidence:")
-    authority = adapt_dict_to_result(analyze_authority(text), 0.8, "authority:")
-    framing = adapt_dict_to_result(analyze_framing(text), 1.2, "framing:")
-    contradictions = adapt_dict_to_result(analyze_contradictions(text), 2.2, "contradiction:")
-    headline_gap = adapt_dict_to_result(analyze_headline_gap(headline, body or text), 1.6, "headline:")
+    # ======================================================
+    # 🔥 FIX CRÍTICO — narrative_patterns ES DICT
+    # ======================================================
+
+    narrative = adapt_dict_to_result(patterns.analyze(text))
+    modules.append(narrative)
+
+    # ======================================================
+    # NUEVOS MÓDULOS (DICT → ADAPTADOS)
+    # ======================================================
+
+    evidence = adapt_dict_to_result(analyze_evidence(text))
+    authority = adapt_dict_to_result(analyze_authority(text))
+    framing = adapt_dict_to_result(analyze_framing(text))
+    contradictions = adapt_dict_to_result(analyze_contradictions(text))
+    headline_gap = adapt_dict_to_result(analyze_headline_gap(headline, body or text))
 
     modules.extend([evidence, authority, framing, contradictions, headline_gap])
+
+    # ======================================================
+    # SCORE
+    # ======================================================
 
     total_points = sum(m.points for m in modules)
     risk_score = max(min(abs(total_points) / MAX_RISK_SCORE, 1.0), 0.0)
 
-    # BOOST
+    # BOOSTS
     if contradictions.points > 0.4:
         risk_score += 0.25
 
@@ -111,12 +128,18 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
 
     risk_score = min(risk_score, 1.0)
 
+    # ======================================================
     # REASONS
+    # ======================================================
+
     all_reasons = list(dict.fromkeys(
         r for m in modules for r in m.reasons
     ))
 
+    # ======================================================
     # SIGNALS
+    # ======================================================
+
     all_signals = list(dict.fromkeys(
         s for m in modules for s in m.evidence
     ))
