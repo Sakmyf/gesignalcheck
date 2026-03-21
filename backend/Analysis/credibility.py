@@ -50,3 +50,6 @@ def check_credibility(text: str) -> RuleResult:
         result.evidence.append("No se detectaron fuentes claras")
 
     return result
+
+def analyze(text: str):
+    return check_credibility(text)
