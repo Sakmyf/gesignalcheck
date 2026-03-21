@@ -28,13 +28,9 @@ SUPPORT_INDICATORS = [
 def check_scientific_claims(text: str) -> RuleResult:
 
     result = RuleResult()
-
     text_lower = text.lower()
 
     claim_matches = []
-
-def analyze(text: str):
-    return check_scientific_claims(text)
 
     for pattern in MEDICAL_KEYWORDS:
         if re.search(pattern, text_lower):
@@ -45,9 +41,14 @@ def analyze(text: str):
         has_support = any(indicator in text_lower for indicator in SUPPORT_INDICATORS)
 
         if not has_support:
-
             result.points += 0.7
             result.reasons.append("unsupported_scientific_claim")
-            result.evidence.append("Afirmación científica fuerte sin respaldo detectado")
+            result.evidence.append(
+                "Afirmación científica fuerte sin respaldo detectado"
+            )
 
     return result
+
+
+def analyze(text: str):
+    return check_scientific_claims(text)

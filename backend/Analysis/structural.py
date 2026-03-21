@@ -1,6 +1,7 @@
 ﻿import re
 from backend.Analysis.rules_types import RuleResult
 
+
 ABSOLUTES = [
     r"\btodos\b",
     r"\bnadie\b",
@@ -16,14 +17,11 @@ CLICKBAIT_PATTERNS = [
     r"increíble",
 ]
 
+
 def check_structural(text: str) -> RuleResult:
 
     result = RuleResult()
-
     text_lower = text.lower()
-
-def analyze(text: str):
-    return check_structural(text)
 
     # 🔴 Generalizaciones absolutas repetidas
     absolute_count = sum(len(re.findall(p, text_lower)) for p in ABSOLUTES)
@@ -31,7 +29,9 @@ def analyze(text: str):
     if absolute_count >= 2:
         result.points += 0.8
         result.reasons.append("absolute_generalization")
-        result.evidence.append(f"Generalizaciones absolutas detectadas ({absolute_count})")
+        result.evidence.append(
+            f"Generalizaciones absolutas detectadas ({absolute_count})"
+        )
 
     # 🟠 Clickbait estructural
     for p in CLICKBAIT_PATTERNS:
@@ -56,3 +56,6 @@ def analyze(text: str):
 
     return result
 
+
+def analyze(text: str):
+    return check_structural(text)

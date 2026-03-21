@@ -1,11 +1,10 @@
 # ======================================================
-# SIGNALCHECK – NARRATIVE PROFILE v1.0
+# SIGNALCHECK – NARRATIVE PROFILE v1.1 (ALINEADO)
 # ======================================================
 
 def build_narrative_profile(signals: list, risk_score: float):
     """
-    Construye un perfil interpretativo del contenido
-    basado en señales detectadas
+    Construye un perfil interpretativo basado en señales reales del engine
     """
 
     s = set(signals)
@@ -20,49 +19,49 @@ def build_narrative_profile(signals: list, risk_score: float):
     # --------------------------------------------------
     # EMOCIONALIDAD
     # --------------------------------------------------
-    if "emotional_language" in s:
+    if "emotional_intensity" in s:
         profile["emocionalidad"] += 0.5
 
-    if "urgency_language" in s:
+    if "urgency_pressure" in s:
         profile["emocionalidad"] += 0.3
 
-    if "polarized_language" in s:
+    if "polarization_detected" in s:
         profile["emocionalidad"] += 0.3
 
     # --------------------------------------------------
     # MANIPULACIÓN
     # --------------------------------------------------
-    if "lack_of_evidence" in s:
+    if "unsupported_scientific_claim" in s:
         profile["manipulacion"] += 0.4
 
     if "exaggerated_promises" in s:
         profile["manipulacion"] += 0.3
 
-    if "headline_exaggeration" in s:
+    if "low_credibility_opinion" in s:
         profile["manipulacion"] += 0.3
 
-    if "weak_authority" in s:
+    if "overgeneralization" in s:
         profile["manipulacion"] += 0.2
 
     # --------------------------------------------------
     # CONFIABILIDAD (inverso)
     # --------------------------------------------------
-    if "lack_of_evidence" in s:
+    if "unsupported_scientific_claim" in s:
         profile["confiabilidad"] -= 0.4
 
-    if "weak_authority" in s:
+    if "low_credibility_opinion" in s:
         profile["confiabilidad"] -= 0.3
 
-    if "internal_contradiction" in s:
+    if "hypothetical_or_unverified_claim" in s:
         profile["confiabilidad"] -= 0.3
 
     # --------------------------------------------------
     # CLARIDAD
     # --------------------------------------------------
-    if "structural_issues" in s:
+    if "clickbait_structure" in s:
         profile["claridad"] -= 0.3
 
-    if "content_mismatch" in s:
+    if "absolute_generalization" in s:
         profile["claridad"] -= 0.3
 
     # --------------------------------------------------

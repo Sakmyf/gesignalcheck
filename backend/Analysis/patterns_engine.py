@@ -1,12 +1,11 @@
 # ======================================================
-# SIGNALCHECK – PATTERN ENGINE v1.0
-# Capa de interpretación narrativa
+# SIGNALCHECK – PATTERN ENGINE v1.1 (ALINEADO)
 # ======================================================
 
 def detect_patterns(signals: list, risk_score: float):
     """
     Detecta patrones narrativos a partir de señales combinadas
-    NO detecta keywords → interpreta comportamiento global
+    Interpretación de comportamiento (no keywords directas)
     """
 
     patterns = []
@@ -15,17 +14,17 @@ def detect_patterns(signals: list, risk_score: float):
     # --------------------------------------------------
     # 1. EMOCIÓN + FALTA DE EVIDENCIA
     # --------------------------------------------------
-    if "emotional_language" in s and "lack_of_evidence" in s:
+    if "emotional_intensity" in s and "unsupported_scientific_claim" in s:
         patterns.append({
             "type": "emotional_manipulation",
             "label": "Lenguaje emocional sin respaldo",
-            "explanation": "El contenido apela a emociones pero no presenta evidencia clara"
+            "explanation": "Se apela a emociones fuertes sin evidencia suficiente"
         })
 
     # --------------------------------------------------
     # 2. AUTORIDAD DÉBIL + AFIRMACIONES FUERTES
     # --------------------------------------------------
-    if "weak_authority" in s and "absolute_claims" in s:
+    if "low_credibility_opinion" in s and "categorical_claim" in s:
         patterns.append({
             "type": "weak_authority_claim",
             "label": "Afirmaciones sin respaldo sólido",
@@ -35,47 +34,47 @@ def detect_patterns(signals: list, risk_score: float):
     # --------------------------------------------------
     # 3. CLICKBAIT (TÍTULO VS CONTENIDO)
     # --------------------------------------------------
-    if "headline_exaggeration" in s and "content_mismatch" in s:
+    if "titular_exagerado" in s or "desfase_titular_contenido" in s:
         patterns.append({
             "type": "clickbait_pattern",
             "label": "Posible clickbait",
-            "explanation": "El título promete más de lo que el contenido desarrolla"
+            "explanation": "El titular exagera o no coincide con el contenido"
         })
 
     # --------------------------------------------------
     # 4. NARRATIVA POLARIZADA
     # --------------------------------------------------
-    if "polarized_language" in s and "lack_of_balance" in s:
+    if "polarization_detected" in s and "overgeneralization" in s:
         patterns.append({
             "type": "polarized_narrative",
             "label": "Narrativa polarizada",
-            "explanation": "Se presenta una única perspectiva sin contraste"
+            "explanation": "Se presenta una visión extrema sin matices"
         })
 
     # --------------------------------------------------
     # 5. URGENCIA ARTIFICIAL
     # --------------------------------------------------
-    if "urgency_language" in s and risk_score > 0.5:
+    if "urgency_pressure" in s and risk_score > 0.5:
         patterns.append({
             "type": "artificial_urgency",
             "label": "Urgencia artificial",
-            "explanation": "Se intenta generar presión para una reacción inmediata"
+            "explanation": "Se intenta generar presión para reaccionar rápido"
         })
 
     # --------------------------------------------------
-    # 6. PROMESAS EXAGERADAS + POCA BASE
+    # 6. PROMESAS EXAGERADAS
     # --------------------------------------------------
-    if "exaggerated_promises" in s and "lack_of_evidence" in s:
+    if "exaggerated_promises" in s:
         patterns.append({
-            "type": "overpromise_without_support",
-            "label": "Promesas sin sustento",
-            "explanation": "Se prometen resultados sin justificar cómo se logran"
+            "type": "overpromise",
+            "label": "Promesas exageradas",
+            "explanation": "Se prometen resultados sin garantías reales"
         })
 
     # --------------------------------------------------
     # 7. CIENTIFICISMO DÉBIL
     # --------------------------------------------------
-    if "scientific_claims" in s and "weak_authority" in s:
+    if "unsupported_scientific_claim" in s:
         patterns.append({
             "type": "weak_scientific_basis",
             "label": "Base científica débil",
@@ -83,23 +82,23 @@ def detect_patterns(signals: list, risk_score: float):
         })
 
     # --------------------------------------------------
-    # 8. CONTRADICCIONES INTERNAS
+    # 8. CONTENIDO HIPOTÉTICO / NO VERIFICADO
     # --------------------------------------------------
-    if "internal_contradiction" in s:
+    if "hypothetical_or_unverified_claim" in s:
         patterns.append({
-            "type": "contradictory_content",
-            "label": "Posibles contradicciones",
-            "explanation": "El contenido presenta inconsistencias internas"
+            "type": "unverified_information",
+            "label": "Información no verificada",
+            "explanation": "Se presentan hechos sin confirmación clara"
         })
 
     # --------------------------------------------------
-    # 9. BAJA CALIDAD INFORMATIVA (GLOBAL)
+    # 9. BAJA CALIDAD INFORMATIVA GLOBAL
     # --------------------------------------------------
     if risk_score > 0.7 and len(s) > 3:
         patterns.append({
             "type": "low_information_quality",
             "label": "Calidad informativa baja",
-            "explanation": "El contenido presenta múltiples señales de baja confiabilidad"
+            "explanation": "El contenido acumula múltiples señales de baja confiabilidad"
         })
 
     return patterns

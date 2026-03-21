@@ -1,12 +1,12 @@
 # ======================================================
-# SIGNALCHECK — NARRATIVE PATTERNS (ADAPTADO v8.7)
+# SIGNALCHECK — NARRATIVE PATTERNS (v8.7 FIX)
 # ======================================================
 
 def analyze(text: str):
 
     lower = text.lower()
 
-    points = 0.0
+    score = 0.0
     reasons = []
     evidence = []
 
@@ -30,8 +30,8 @@ def analyze(text: str):
     matches = [p for p in conspirative_patterns if p in lower]
 
     if matches:
-        points -= 0.6
-        reasons.append("estructura narrativa conspirativa detectada")
+        score += 0.6
+        reasons.append("conspiracy_narrative")
         evidence.extend(matches)
 
     # =========================================
@@ -53,8 +53,8 @@ def analyze(text: str):
     matches = [p for p in dramatized_patterns if p in lower]
 
     if len(matches) >= 2:
-        points -= 0.4
-        reasons.append("estructura narrativa dramatizada")
+        score += 0.4
+        reasons.append("dramatized_structure")
         evidence.extend(matches)
 
     # =========================================
@@ -73,8 +73,8 @@ def analyze(text: str):
     matches = [p for p in reconstruction_clues if p in lower]
 
     if len(matches) >= 2:
-        points -= 0.5
-        reasons.append("posible reconstrucción no verificable")
+        score += 0.5
+        reasons.append("unverified_reconstruction")
         evidence.extend(matches)
 
     # =========================================
@@ -91,8 +91,8 @@ def analyze(text: str):
     connector_count = sum(1 for c in narrative_connectors if c in lower)
 
     if connector_count >= 5:
-        points -= 0.2
-        reasons.append("estructura narrativa secuencial")
+        score += 0.2
+        reasons.append("narrative_sequence")
 
     # =========================================
     # LIMPIEZA FINAL
@@ -101,9 +101,8 @@ def analyze(text: str):
     evidence = list(dict.fromkeys(evidence))
     reasons = list(dict.fromkeys(reasons))
 
-    # 🔥 FORMATO COMPATIBLE CON TU ENGINE
     return {
-        "score": abs(points),   # importante → positivo
+        "score": round(score, 2),
         "reasons": reasons,
         "evidence": evidence
     }

@@ -1,4 +1,4 @@
-﻿# credibility.py
+﻿# backend/Analysis/credibility.py
 
 import re
 from backend.Analysis.rules_types import RuleResult
@@ -33,23 +33,52 @@ def check_credibility(text: str) -> RuleResult:
     result = RuleResult()
     text_lower = text.lower()
 
-    has_source = any(re.search(p, text_lower) for p in SOURCE_PATTERNS)
-    has_data = any(re.search(p, text_lower) for p in DATA_PATTERNS)
-    has_opinion = any(re.search(p, text_lower) for p in OPINION_PATTERNS)
+    found_sources = [p for p in SOURCE_PATTERNS if re.search(p, text_lower)]
+    found_data = [p for p in DATA_PATTERNS if re.search(p, text_lower)]
+    found_opinions = [p for p in OPINION_PATTERNS if re.search(p, text_lower)]
 
+    has_source = bool(found_sources)
+    has_data = bool(found_data)
+    has_opinion = bool(found_opinions)
+
+    # ======================================================
     # 🔴 Opinión fuerte sin respaldo
+    # ======================================================
+
     if has_opinion and not has_source and not has_data:
         result.points += 0.9
         result.reasons.append("low_credibility_opinion")
-        result.evidence.append("Opinión fuerte sin fuentes ni datos")
+        result.evidence.append(
+            f"Opinión fuerte detectada sin respaldo ({', '.join(found_opinions)})"
+        )
 
+    # ======================================================
     # 🟠 Sin fuentes detectadas
+    # ======================================================
+
     elif not has_source:
         result.points += 0.5
         result.reasons.append("no_detected_source")
         result.evidence.append("No se detectaron fuentes claras")
 
+    # ======================================================
+    # 🟢 Bonus: contenido con fuentes + datos
+    # ======================================================
+
+    if has_source and has_data:
+        result.points -= 0.2  # reduce riesgo
+        result.reasons.append("supported_information")
+        result.evidence.append("Contenido con fuentes y datos detectados")
+
+    # ======================================================
+    # LIMPIEZA
+    # ======================================================
+
+    result.reasons = list(dict.fromkeys(result.reasons))
+    result.evidence = list(dict.fromkeys(result.evidence))
+
     return result
+
 
 def analyze(text: str):
     return check_credibility(text)
