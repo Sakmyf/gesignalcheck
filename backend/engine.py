@@ -81,7 +81,7 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
         polarization.analyze(text),
         scientific.analyze(text),
         hypothetical.analyze(text),
-        patterns.check_narrative_patterns(text)
+        patterns.analyze(text)
     ]
 
     # NUEVOS

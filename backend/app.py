@@ -166,7 +166,6 @@ async def verify(
         premium_requested=False,
         engine_version=ENGINE_VERSION,
         analysis_key=analysis_key,
-        domain=domain,
         created_at=datetime.utcnow()
     )
 
