@@ -1,15 +1,17 @@
-from backend.Analysis.base import AnalysisResult
+# ======================================================
+# SIGNALCHECK — NARRATIVE PATTERNS (ADAPTADO v8.7)
+# ======================================================
 
+def analyze(text: str):
 
-def check_narrative_patterns(text: str) -> AnalysisResult:
-
-    result = AnalysisResult()
     lower = text.lower()
+
+    points = 0.0
+    reasons = []
+    evidence = []
 
     # =========================================
     # BLOQUE 1 — CONSPIRATIVO
-    # Frases específicas de narrativa de ocultamiento
-    # Peso: -0.6 (alto — señal clara)
     # =========================================
 
     conspirative_patterns = [
@@ -25,17 +27,15 @@ def check_narrative_patterns(text: str) -> AnalysisResult:
         "nadie habla de esto",
     ]
 
-    conspirative_matches = [p for p in conspirative_patterns if p in lower]
+    matches = [p for p in conspirative_patterns if p in lower]
 
-    if conspirative_matches:
-        result.points -= 0.6
-        result.reasons.append("estructura narrativa conspirativa detectada")
-        result.evidence.extend(conspirative_matches)
+    if matches:
+        points -= 0.6
+        reasons.append("estructura narrativa conspirativa detectada")
+        evidence.extend(matches)
 
     # =========================================
-    # BLOQUE 2 — NARRATIVA DRAMATIZADA
-    # Frases de escenificación emocional — requiere 2+ coincidencias
-    # Peso: -0.4 (medio)
+    # BLOQUE 2 — DRAMATIZACIÓN
     # =========================================
 
     dramatized_patterns = [
@@ -50,17 +50,15 @@ def check_narrative_patterns(text: str) -> AnalysisResult:
         "incapaz de",
     ]
 
-    dramatized_matches = [p for p in dramatized_patterns if p in lower]
+    matches = [p for p in dramatized_patterns if p in lower]
 
-    if len(dramatized_matches) >= 2:
-        result.points -= 0.4
-        result.reasons.append("estructura narrativa dramatizada")
-        result.evidence.extend(dramatized_matches)
+    if len(matches) >= 2:
+        points -= 0.4
+        reasons.append("estructura narrativa dramatizada")
+        evidence.extend(matches)
 
     # =========================================
-    # BLOQUE 3 — INDICIOS DE RECONSTRUCCIÓN
-    # Señales de relato no verificable — requiere 2+ coincidencias
-    # Peso: -0.5 (medio-alto)
+    # BLOQUE 3 — RECONSTRUCCIÓN
     # =========================================
 
     reconstruction_clues = [
@@ -72,17 +70,15 @@ def check_narrative_patterns(text: str) -> AnalysisResult:
         "versiones",
     ]
 
-    reconstruction_matches = [p for p in reconstruction_clues if p in lower]
+    matches = [p for p in reconstruction_clues if p in lower]
 
-    if len(reconstruction_matches) >= 2:
-        result.points -= 0.5
-        result.reasons.append("posible reconstrucción no verificable")
-        result.evidence.extend(reconstruction_matches)
+    if len(matches) >= 2:
+        points -= 0.5
+        reasons.append("posible reconstrucción no verificable")
+        evidence.extend(matches)
 
     # =========================================
-    # BLOQUE 4 — TONO NARRATIVO SECUENCIAL
-    # Conectores genéricos — umbral alto para evitar falsos positivos
-    # Peso: -0.2 (bajo — señal débil)
+    # BLOQUE 4 — CONECTORES NARRATIVOS
     # =========================================
 
     narrative_connectors = [
@@ -95,14 +91,19 @@ def check_narrative_patterns(text: str) -> AnalysisResult:
     connector_count = sum(1 for c in narrative_connectors if c in lower)
 
     if connector_count >= 5:
-        result.points -= 0.2
-        result.reasons.append("estructura narrativa secuencial")
+        points -= 0.2
+        reasons.append("estructura narrativa secuencial")
 
     # =========================================
-    # LIMPIEZA FINAL — dedup con orden estable
+    # LIMPIEZA FINAL
     # =========================================
 
-    result.evidence = list(dict.fromkeys(result.evidence))
-    result.reasons = list(dict.fromkeys(result.reasons))
+    evidence = list(dict.fromkeys(evidence))
+    reasons = list(dict.fromkeys(reasons))
 
-    return result
+    # 🔥 FORMATO COMPATIBLE CON TU ENGINE
+    return {
+        "score": abs(points),   # importante → positivo
+        "reasons": reasons,
+        "evidence": evidence
+    }
