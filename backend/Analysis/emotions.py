@@ -39,3 +39,7 @@ def check_emotions(text: str) -> RuleResult:
         )
 
     return result
+
+
+def analyze(text: str):
+    return check_emotions(text)
