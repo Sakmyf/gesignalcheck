@@ -1,78 +1,37 @@
 # ======================================================
-# SOURCE ANALYZER — ENGINE v8.7 COMPATIBLE
+# SOURCE ADJUSTER — ENGINE v8.7 COMPATIBLE (FIXED)
 # ======================================================
 
-from backend.domain_reputation import calculate_domain_score
+def adjust_score_by_source(score: float, source: dict):
 
+    if not source:
+        return score
 
-KNOWN_MEDIA = [
-    "clarin.com",
-    "lanacion.com.ar",
-    "infobae.com",
-    "iprofesional.com"
-]
-
-LOW_QUALITY_PATTERNS = [
-    ".xyz",
-    ".click",
-    ".top",
-    "viral",
-    "shocking",
-    "increible"
-]
-
-
-def analyze_source(url: str):
-
-    if not url:
-        return {
-            "domain": "",
-            "score": 0,
-            "signals": ["sin información de fuente"],
-            "trust_level": 0.5,
-            "type": "unknown"
-        }
-
-    u = url.lower()
+    # 🔥 USAR trust_level (tu formato actual)
+    trust = source.get("trust_level", 0.5)
 
     # --------------------------------------------------
-    # BASE: DOMAIN REPUTATION
+    # 🟢 MUY CONFIABLE
     # --------------------------------------------------
-    domain_data = calculate_domain_score(url)
-
-    trust_level = 0.6
-    source_type = "generic"
-    reason = "fuente no categorizada"
+    if trust >= 0.8:
+        score *= 0.4
 
     # --------------------------------------------------
-    # MEDIO CONOCIDO
+    # 🟡 MEDIA
     # --------------------------------------------------
-    for domain in KNOWN_MEDIA:
-        if domain in u:
-            trust_level = 0.85
-            source_type = "recognized_media"
-            reason = "medio reconocido"
-            break
+    elif trust >= 0.6:
+        score *= 0.6
 
     # --------------------------------------------------
-    # DOMINIOS SOSPECHOSOS
+    # ⚪ NEUTRA
     # --------------------------------------------------
-    for pattern in LOW_QUALITY_PATTERNS:
-        if pattern in u:
-            trust_level = 0.3
-            source_type = "low_quality"
-            reason = "dominio de baja calidad"
-            break
+    elif trust >= 0.4:
+        score *= 0.85
 
     # --------------------------------------------------
-    # OUTPUT FINAL COMPATIBLE ENGINE
+    # 🔴 BAJA
     # --------------------------------------------------
-    return {
-        "domain": domain_data.get("domain", ""),
-        "score": domain_data.get("score", 0),
-        "signals": domain_data.get("signals_positive", []) +
-                   domain_data.get("signals_negative", []) +
-                   [reason],
-        "trust_level": trust_level,
-        "type": source_type
-    }
+    else:
+        score *= 1.2
+
+    return max(0.0, min(score, 1.0))

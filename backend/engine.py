@@ -1,11 +1,11 @@
 # ======================================================
-# SIGNALCHECK ENGINE v8.7 — CLEAN STABLE (FIXED)
+# SIGNALCHECK ENGINE v8.8 — CALIBRATED (FIXED)
 # ======================================================
 
-print("🔥 ENGINE v8.7 REAL OK")
+print("🔥 ENGINE v8.8 CALIBRATED OK")
 
 # ======================================================
-# IMPORTS REALES
+# IMPORTS
 # ======================================================
 
 from backend.Analysis import (
@@ -21,23 +21,21 @@ from backend.Analysis import (
     narrative_patterns as patterns
 )
 
-# NUEVOS MÓDULOS
 from backend.Analysis.evidence import analyze_evidence
 from backend.Analysis.authority import analyze_authority
 from backend.Analysis.framing import analyze_framing
 from backend.Analysis.contradictions import analyze_contradictions
 from backend.Analysis.headline_gap import analyze_headline_gap
 
-# CAPAS
 from backend.Analysis.patterns_engine import detect_patterns
 from backend.Analysis.narrative_profile import build_narrative_profile
+
 from backend.context_classifier import classify_context
 from backend.context_adjuster import adjust_signals_by_context
 from backend.source_analyzer import analyze_source
 from backend.source_adjuster import adjust_score_by_source
 from backend.confidence_score import compute_confidence
 
-# UTILS
 from backend.utils.analysis_adapter import adapt_dict_to_result
 from backend.text_normalizer import normalize_text
 
@@ -72,7 +70,7 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
     source_info = analyze_source(url)
 
     # ======================================================
-    # MÓDULOS LEGACY (OK)
+    # MÓDULOS
     # ======================================================
 
     modules = [
@@ -87,17 +85,11 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
         hypothetical.analyze(text),
     ]
 
-    # ======================================================
-    # 🔥 FIX CRÍTICO — narrative_patterns ES DICT
-    # ======================================================
-
+    # narrative patterns (dict → adaptado)
     narrative = adapt_dict_to_result(patterns.analyze(text))
     modules.append(narrative)
 
-    # ======================================================
-    # NUEVOS MÓDULOS (DICT → ADAPTADOS)
-    # ======================================================
-
+    # nuevos módulos
     evidence = adapt_dict_to_result(analyze_evidence(text))
     authority = adapt_dict_to_result(analyze_authority(text))
     framing = adapt_dict_to_result(analyze_framing(text))
@@ -107,56 +99,75 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
     modules.extend([evidence, authority, framing, contradictions, headline_gap])
 
     # ======================================================
-    # SCORE
+    # SCORE BASE
     # ======================================================
 
     total_points = sum(m.points for m in modules)
-    risk_score = max(min(abs(total_points) / MAX_RISK_SCORE, 1.0), 0.0)
 
-    # BOOSTS
-    if contradictions.points > 0.4:
-        risk_score += 0.25
-
-    if evidence.points < 0.3:
-        risk_score += 0.2
-
-    if headline_gap.points > 0.4:
-        risk_score += 0.2
-
-    if framing.points > 0.5:
-        risk_score += 0.15
-
-    risk_score = min(risk_score, 1.0)
+    # ❌ SIN abs() — permite compensación real
+    risk_score = total_points / MAX_RISK_SCORE
 
     # ======================================================
-    # REASONS
+    # 🔥 COMPENSACIONES (CLAVE)
+    # ======================================================
+
+    # evidencia fuerte baja riesgo
+    risk_score -= evidence.points * 0.6
+
+    # autoridad fuerte (negativa) compensa
+    if authority.points < 0:
+        risk_score += authority.points * 0.5  # ya es negativo
+
+    # ======================================================
+    # BOOSTS SUAVES
+    # ======================================================
+
+    if contradictions.points > 0.4:
+        risk_score += 0.15
+
+    if evidence.points < 0.3:
+        risk_score += 0.15
+
+    if headline_gap.points > 0.4:
+        risk_score += 0.12
+
+    if framing.points > 0.5:
+        risk_score += 0.10
+
+    # ======================================================
+    # NORMALIZACIÓN
+    # ======================================================
+
+    risk_score = max(0.0, min(risk_score, 1.0))
+
+    # ======================================================
+    # REASONS + SIGNALS
     # ======================================================
 
     all_reasons = list(dict.fromkeys(
         r for m in modules for r in m.reasons
     ))
 
-    # ======================================================
-    # SIGNALS
-    # ======================================================
-
     all_signals = list(dict.fromkeys(
         s for m in modules for s in m.evidence
     ))
 
-    # CONTEXTO
+    # ajuste por contexto
     all_signals = adjust_signals_by_context(all_signals, context)
 
-    # PATTERNS
+    # patterns
     patterns_detected = detect_patterns(all_signals, risk_score)
 
-    # PROFILE
+    # perfil narrativo
     narrative_profile = build_narrative_profile(all_signals, risk_score)
 
-    # SOURCE
+    # ajuste por fuente
     risk_score = adjust_score_by_source(risk_score, source_info)
 
+    # ======================================================
     # INSIGHT
+    # ======================================================
+
     if risk_score < 0.3:
         insight = "contenido informativo"
     elif risk_score < 0.6:
@@ -164,10 +175,10 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
     else:
         insight = "contenido con presión narrativa"
 
-    # CONFIDENCE
+    # confidence
     confidence = compute_confidence(all_signals, patterns_detected)
 
-    # LEVEL
+    # nivel
     if risk_score < 0.3:
         level = "low"
     elif risk_score < 0.6:
@@ -191,7 +202,7 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
 
 
 # ======================================================
-# COMPATIBILIDAD APP.PY
+# COMPATIBILIDAD
 # ======================================================
 
 def analyze_context(text: str, headline: str = "", body: str = "", url: str = ""):
