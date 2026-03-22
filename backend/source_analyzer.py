@@ -1,37 +1,83 @@
 # ======================================================
-# SOURCE ADJUSTER — ENGINE v8.7 COMPATIBLE (FIXED)
+# SOURCE ANALYZER — FIXED VERSION
 # ======================================================
 
-def adjust_score_by_source(score: float, source: dict):
+def analyze_source(url: str):
 
-    if not source:
-        return score
+    if not url:
+        return {
+            "domain": "",
+            "trust_level": 0.5,
+            "type": "unknown",
+            "signals": ["sin información de fuente"]
+        }
 
-    # 🔥 USAR trust_level (tu formato actual)
-    trust = source.get("trust_level", 0.5)
+    u = url.lower()
 
     # --------------------------------------------------
-    # 🟢 MUY CONFIABLE
+    # 🟢 ALTA CONFIANZA
     # --------------------------------------------------
-    if trust >= 0.8:
-        score *= 0.4
+    high_trust = [
+        "argentina.gob.ar",
+        "gov.ar",
+        "who.int",
+        "un.org",
+        "vatican.va"
+    ]
 
     # --------------------------------------------------
     # 🟡 MEDIA
     # --------------------------------------------------
-    elif trust >= 0.6:
-        score *= 0.6
-
-    # --------------------------------------------------
-    # ⚪ NEUTRA
-    # --------------------------------------------------
-    elif trust >= 0.4:
-        score *= 0.85
+    medium_trust = [
+        "clarin.com",
+        "lanacion.com.ar",
+        "infobae.com"
+    ]
 
     # --------------------------------------------------
     # 🔴 BAJA
     # --------------------------------------------------
-    else:
-        score *= 1.2
+    low_trust = [
+        "cronica.com.ar",
+        ".click",
+        ".xyz",
+        ".top"
+    ]
 
-    return max(0.0, min(score, 1.0))
+    # --------------------------------------------------
+    # MATCH
+    # --------------------------------------------------
+
+    for d in high_trust:
+        if d in u:
+            return {
+                "domain": d,
+                "trust_level": 0.95,
+                "type": "high_trust",
+                "signals": ["fuente institucional confiable"]
+            }
+
+    for d in medium_trust:
+        if d in u:
+            return {
+                "domain": d,
+                "trust_level": 0.7,
+                "type": "medium_trust",
+                "signals": ["medio reconocido"]
+            }
+
+    for d in low_trust:
+        if d in u:
+            return {
+                "domain": d,
+                "trust_level": 0.3,
+                "type": "low_trust",
+                "signals": ["fuente de baja calidad"]
+            }
+
+    return {
+        "domain": "unknown",
+        "trust_level": 0.5,
+        "type": "neutral",
+        "signals": ["fuente no categorizada"]
+    }
