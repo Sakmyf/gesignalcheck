@@ -1,4 +1,4 @@
-print("APP FILE ACTUAL 11.8 - error safe mode activo")
+print("APP FILE ACTUAL 12.0 - calibrated scoring FIXED")
 
 # ==========================================================
 # IMPORTS
@@ -27,7 +27,7 @@ from backend.utils.content_versioning import (
 # ==========================================================
 
 API_VERSION = "v3"
-ENGINE_VERSION = "v8.6"
+ENGINE_VERSION = "v8.7"
 PROMPT_VERSION = "none"
 
 # ==========================================================
@@ -42,7 +42,7 @@ app = FastAPI(title="GE SignalCheck API v8 - Stable")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 🔥 para desarrollo (clave)
+    allow_origins=["*"],  # desarrollo abierto
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -83,6 +83,10 @@ async def verify(
     db: Session = Depends(get_db)
 ):
 
+    # ======================================================
+    # VALIDACIÓN EXTENSIÓN
+    # ======================================================
+
     if not x_extension_id:
         raise HTTPException(status_code=401, detail="Extensión no identificada")
 
@@ -112,6 +116,10 @@ async def verify(
     text = data.text
     url  = data.url or ""
 
+    # ======================================================
+    # HASH + CACHE KEY
+    # ======================================================
+
     content_hash = generate_content_hash(text)
 
     analysis_key = build_analysis_key(
@@ -121,27 +129,44 @@ async def verify(
         prompt_version=PROMPT_VERSION
     )
 
-    # ==========================================================
-    # 🔥 BLOQUE PROTEGIDO (CLAVE)
-    # ==========================================================
+    # ======================================================
+    # 🔥 ANALYSIS CORE (PROTEGIDO)
+    # ======================================================
 
     try:
         result = analyze_context(text, url)
 
+        # Ajuste final
         result = apply_context_adjustment(result)
-        summary = build_summary(result)
 
-        status_color = result.get("status", "neutral")
-        level = result.get("label", "indeterminado")
+        # Score limpio
+        score = float(result.get("score", 0))
+
+        # ==================================================
+        # 🔥 CALIBRACIÓN REAL (FIX CLAVE)
+        # ==================================================
+
+        if score < 0.30:
+            status_color = "green"
+            level = "bajo"
+
+        elif score < 0.60:
+            status_color = "yellow"
+            level = "medio"
+
+        else:
+            status_color = "red"
+            level = "alto"
+
+        summary = build_summary(result)
 
     except Exception as e:
         print("🔥 ERROR EN ANALISIS:", str(e))
 
+        score = 0.0
         result = {
             "score": 0,
             "signals": [],
-            "status": "neutral",
-            "label": "error",
             "context_note": "No se pudo analizar el contenido"
         }
 
@@ -149,28 +174,36 @@ async def verify(
         status_color = "neutral"
         level = "error"
 
-    # ==========================================================
-    # GUARDADO
-    # ==========================================================
+    # ======================================================
+    # GUARDADO DB
+    # ======================================================
 
     parsed = urlparse(url)
     domain = parsed.netloc if parsed.netloc else "unknown"
 
-    analysis_log = AnalysisLog(
-        trust_score=result.get("score", 0),
-        rhetorical_score=0,
-        narrative_score=0,
-        absence_score=0,
-        risk_index=result.get("score", 0),
-        level=level,
-        premium_requested=False,
-        engine_version=ENGINE_VERSION,
-        analysis_key=analysis_key
-    )
+    try:
+        analysis_log = AnalysisLog(
+            trust_score=score,
+            rhetorical_score=0,
+            narrative_score=0,
+            absence_score=0,
+            risk_index=score,
+            level=level,
+            premium_requested=False,
+            engine_version=ENGINE_VERSION,
+            analysis_key=analysis_key
+        )
 
-    db.add(analysis_log)
-    extension.analyses_used += 1
-    db.commit()
+        db.add(analysis_log)
+        extension.analyses_used += 1
+        db.commit()
+
+    except Exception as db_error:
+        print("⚠️ ERROR GUARDANDO EN DB:", str(db_error))
+
+    # ======================================================
+    # INDICADORES
+    # ======================================================
 
     indicators = [
         {
@@ -181,14 +214,19 @@ async def verify(
         for s in result.get("signals", [])[:5]
     ]
 
+    # ======================================================
+    # RESPONSE FINAL
+    # ======================================================
+
     return {
         "analysis": {
             "level": level,
             "summary": summary,
             "indicators": indicators,
             "shown_indicators": len(indicators),
-            "structural_index": result.get("score", 0),
-            "context_note": result.get("context_note", "")
+            "structural_index": score,
+            "context_note": result.get("context_note", ""),
+            "status_color": status_color
         },
         "meta": {
             "engine_version": ENGINE_VERSION,
