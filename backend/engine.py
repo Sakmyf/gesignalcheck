@@ -226,3 +226,53 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
 
 def analyze_context(text: str, headline: str = "", body: str = "", url: str = ""):
     return analyze_content(text, headline, body, url)
+
+# ======================================================
+# SCORE BASE
+# ======================================================
+
+risk_score = (
+    narrative_score * 0.25 +
+    rhetorical_score * 0.25 +
+    absence_score * 0.2 +
+    authority_score * 0.15 +
+    urgency_score * 0.15
+)
+
+# ======================================================
+# AJUSTE POR FUENTE (CLAVE)
+# ======================================================
+
+trust = source_info.get("trust_level", 0.5)
+
+# penaliza o reduce fuerte
+if trust >= 0.8:
+    risk_score *= 0.6   # BAJA fuerte (institucional / medios grandes)
+
+elif trust >= 0.6:
+    risk_score *= 0.8   # BAJA moderada
+
+elif trust <= 0.3:
+    risk_score *= 1.2   # SUBE riesgo
+
+# ======================================================
+# NORMALIZACIÓN FINAL
+# ======================================================
+
+risk_score = max(0.0, min(risk_score, 1.0))
+
+# ======================================================
+# CLASIFICACIÓN (AJUSTADA)
+# ======================================================
+
+if risk_score < 0.35:
+    level = "green"
+    message = "Contenido con estructura confiable"
+
+elif risk_score < 0.65:
+    level = "yellow"
+    message = "Contenido con señales mixtas"
+
+else:
+    level = "red"
+    message = "Requiere atención"
