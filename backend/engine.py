@@ -1,147 +1,86 @@
 # ======================================================
-# SIGNALCHECK ENGINE v9.2 — CALIBRADO PRO REAL
+# SIGNALCHECK ENGINE v9.3 – STABLE CALIBRATED
 # ======================================================
 
-print("🔥 ENGINE v9.2 CALIBRATED PRO OK")
-
-from backend.Analysis import (
-    emotions,
-    credibility,
-    misinformation,
-    structural,
-    urgency,
-    promises,
-    polarization,
-    scientific_claims as scientific,
-    hypothetical,
-    narrative_patterns as patterns
-)
-
-from backend.Analysis.evidence import analyze_evidence
-from backend.Analysis.authority import analyze_authority
-from backend.Analysis.framing import analyze_framing
+from backend.Analysis.credibility import analyze as analyze_credibility
 from backend.Analysis.contradictions import analyze_contradictions
-from backend.Analysis.headline_gap import analyze_headline_gap
+from backend.Analysis.authority import analyze_authority
+from backend.Analysis.urgency import check_urgency
 
-from backend.Analysis.patterns_engine import detect_patterns
-from backend.Analysis.narrative_profile import build_narrative_profile
-
-from backend.context_classifier import classify_context
-from backend.context_adjuster import adjust_signals_by_context
 from backend.source_analyzer import analyze_source
 from backend.source_adjuster import adjust_score_by_source
-from backend.confidence_score import compute_confidence
-
-from backend.utils.analysis_adapter import adapt_dict_to_result
-from backend.text_normalizer import normalize_text
-
-# 🔥 CLAVE: mayor divisor → menos agresividad
-MAX_RISK_SCORE = 8.0
 
 
-# ======================================================
-# CORE
-# ======================================================
+def analyze_context(text: str, url: str = ""):
 
-def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""):
-
-    if not text or len(text.strip()) < 30:
+    if not text:
         return {
             "score": 0.0,
-            "risk_score": 0.0,
-            "risk_level": "low",
-            "confidence": 0.2,
-            "insight": "contenido insuficiente",
-            "context": "unknown",
-            "source": {},
-            "reasons": [],
+            "level": "green",
             "signals": [],
-            "patterns": [],
-            "profile": {},
-            "total_modules": 0
+            "message": "Sin contenido"
         }
 
-    text = normalize_text(text)
+    # ======================================================
+    # ANALISIS BASE
+    # ======================================================
 
-    context = classify_context(text)
+    credibility = analyze_credibility(text)
+    contradictions = analyze_contradictions(text)
+    authority = analyze_authority(text)
+    urgency = check_urgency(text)
+
+    # ======================================================
+    # NORMALIZACIÓN DE SALIDAS
+    # (COMPATIBLE dict / objeto)
+    # ======================================================
+
+    def get_score(x):
+        if isinstance(x, dict):
+            return x.get("score", 0.0)
+        return getattr(x, "points", 0.0)
+
+    def get_signals(x):
+        if isinstance(x, dict):
+            return x.get("signals", [])
+        return getattr(x, "reasons", [])
+
+    # EXTRAER SCORES (FIX CRÍTICO)
+    narrative_score = get_score(credibility)
+    rhetorical_score = get_score(contradictions)
+    absence_score = 0.2 if narrative_score > 0.5 else 0.0  # proxy suave
+    authority_score = get_score(authority)
+    urgency_score = get_score(urgency)
+
+    # ======================================================
+    # SCORE BASE (BALANCEADO)
+    # ======================================================
+
+    risk_score = (
+        narrative_score * 0.25 +
+        rhetorical_score * 0.25 +
+        absence_score * 0.15 +
+        authority_score * 0.2 +
+        urgency_score * 0.15
+    )
+
+    # ======================================================
+    # ANALISIS DE FUENTE (CLAVE)
+    # ======================================================
+
     source_info = analyze_source(url)
-
-    # ======================================================
-    # MÓDULOS
-    # ======================================================
-
-    modules = [
-        emotions.analyze(text),
-        credibility.analyze(text),
-        misinformation.analyze(text),
-        structural.analyze(text),
-        urgency.analyze(text),
-        promises.analyze(text),
-        polarization.analyze(text),
-        scientific.analyze(text),
-        hypothetical.analyze(text),
-    ]
-
-    narrative = adapt_dict_to_result(patterns.analyze(text))
-    modules.append(narrative)
-
-    evidence = adapt_dict_to_result(analyze_evidence(text))
-    authority = adapt_dict_to_result(analyze_authority(text))
-    framing = adapt_dict_to_result(analyze_framing(text))
-    contradictions = adapt_dict_to_result(analyze_contradictions(text))
-    headline_gap = adapt_dict_to_result(analyze_headline_gap(headline, body or text))
-
-    modules.extend([evidence, authority, framing, contradictions, headline_gap])
-
-    # ======================================================
-    # SCORE BASE
-    # ======================================================
-
-    total_points = sum(m.points for m in modules)
-
-    # 🔥 NORMALIZACIÓN
-    risk_score = total_points / MAX_RISK_SCORE
-
-    # ======================================================
-    # 🔥 COMPENSACIONES FUERTES (CLAVE)
-    # ======================================================
-
-    # evidencia reduce fuerte
-    risk_score -= evidence.points * 1.4
-
-    # autoridad fuerte reduce
-    if authority.points < 0:
-        risk_score += authority.points * 0.8
-
-    # contenido factual reduce
-    if framing.points < 0:
-        risk_score += framing.points * 0.5
-
-    # ======================================================
-    # FUENTE (MEJORADO)
-    # ======================================================
-
     trust = source_info.get("trust_level", 0.5)
 
-    if trust > 0.8:
-        risk_score *= 0.7
-    elif trust > 0.6:
-        risk_score *= 0.85
-    elif trust < 0.4:
-        risk_score *= 1.1
+    # ajuste fuerte (esto arregla el "todo rojo")
+    if trust >= 0.8:
+        risk_score *= 0.6
+    elif trust >= 0.6:
+        risk_score *= 0.8
+    elif trust <= 0.3:
+        risk_score *= 1.2
 
-    # ======================================================
-    # BOOSTS CONTROLADOS (MUCHO MÁS SUAVES)
-    # ======================================================
-
-    if contradictions.points > 0.5:
-        risk_score += 0.05
-
-    if headline_gap.points > 0.5:
-        risk_score += 0.05
-
-    if framing.points > 0.6:
-        risk_score += 0.04
+    # también aplicamos el adjuster si querés mantenerlo
+    risk_score = adjust_score_by_source(risk_score, source_info)
 
     # ======================================================
     # NORMALIZACIÓN FINAL
@@ -150,129 +89,44 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
     risk_score = max(0.0, min(risk_score, 1.0))
 
     # ======================================================
-    # SIGNALS
+    # CLASIFICACIÓN FINAL (IMPORTANTE)
     # ======================================================
 
-    all_reasons = list(dict.fromkeys(
-        r for m in modules for r in m.reasons
-    ))
+    if risk_score < 0.35:
+        level = "green"
+        message = "Contenido con estructura confiable"
 
-    all_signals = list(dict.fromkeys(
-        s for m in modules for s in m.evidence
-    ))
+    elif risk_score < 0.65:
+        level = "yellow"
+        message = "Contenido con señales mixtas"
 
-    all_signals = adjust_signals_by_context(all_signals, context)
-
-    # ======================================================
-    # PATTERNS + PROFILE
-    # ======================================================
-
-    patterns_detected = detect_patterns(all_signals, risk_score)
-    narrative_profile = build_narrative_profile(all_signals, risk_score)
-
-    # ajuste final por fuente
-    risk_score = adjust_score_by_source(risk_score, source_info)
-
-    # ======================================================
-    # 🔥 BOOST POSITIVO FINAL
-    # ======================================================
-
-    if evidence.points > 0.4 and trust > 0.7:
-        risk_score *= 0.6
-
-    # clamp final otra vez
-    risk_score = max(0.0, min(risk_score, 1.0))
-
-    # ======================================================
-    # INSIGHT
-    # ======================================================
-
-    if risk_score < 0.30:
-        insight = "contenido confiable"
-    elif risk_score < 0.60:
-        insight = "requiere lectura crítica"
     else:
-        insight = "contenido con presión narrativa"
-
-    confidence = compute_confidence(all_signals, patterns_detected)
+        level = "red"
+        message = "Requiere atención"
 
     # ======================================================
-    # LEVEL
+    # SEÑALES
     # ======================================================
 
-    if risk_score < 0.30:
-        level = "low"
-    elif risk_score < 0.60:
-        level = "medium"
-    else:
-        level = "high"
+    signals = (
+        get_signals(credibility) +
+        get_signals(contradictions) +
+        get_signals(authority) +
+        get_signals(urgency) +
+        source_info.get("signals", [])
+    )
+
+    # limpiar duplicados
+    signals = list(set(signals))[:6]
+
+    # ======================================================
+    # OUTPUT FINAL
+    # ======================================================
 
     return {
-        # 🔥 COMPATIBILIDAD TOTAL CON TU APP
-        "score": round(risk_score, 3),
-        "risk_score": round(risk_score, 3),
-        "risk_level": level,
-        "confidence": round(confidence, 3),
-        "insight": insight,
-        "context": context,
-        "source": source_info,
-        "reasons": all_reasons[:5],
-        "signals": all_signals,
-        "patterns": patterns_detected,
-        "profile": narrative_profile,
-        "total_modules": len(modules)
+        "score": round(risk_score, 2),
+        "level": level,
+        "message": message,
+        "signals": signals,
+        "source": source_info
     }
-
-
-def analyze_context(text: str, headline: str = "", body: str = "", url: str = ""):
-    return analyze_content(text, headline, body, url)
-
-# ======================================================
-# SCORE BASE
-# ======================================================
-
-risk_score = (
-    narrative_score * 0.25 +
-    rhetorical_score * 0.25 +
-    absence_score * 0.2 +
-    authority_score * 0.15 +
-    urgency_score * 0.15
-)
-
-# ======================================================
-# AJUSTE POR FUENTE (CLAVE)
-# ======================================================
-
-trust = source_info.get("trust_level", 0.5)
-
-# penaliza o reduce fuerte
-if trust >= 0.8:
-    risk_score *= 0.6   # BAJA fuerte (institucional / medios grandes)
-
-elif trust >= 0.6:
-    risk_score *= 0.8   # BAJA moderada
-
-elif trust <= 0.3:
-    risk_score *= 1.2   # SUBE riesgo
-
-# ======================================================
-# NORMALIZACIÓN FINAL
-# ======================================================
-
-risk_score = max(0.0, min(risk_score, 1.0))
-
-# ======================================================
-# CLASIFICACIÓN (AJUSTADA)
-# ======================================================
-
-if risk_score < 0.35:
-    level = "green"
-    message = "Contenido con estructura confiable"
-
-elif risk_score < 0.65:
-    level = "yellow"
-    message = "Contenido con señales mixtas"
-
-else:
-    level = "red"
-    message = "Requiere atención"
