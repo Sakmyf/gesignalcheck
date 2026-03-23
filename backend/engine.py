@@ -1,12 +1,8 @@
 # ======================================================
-# SIGNALCHECK ENGINE v9.0 — FINAL FINAL
+# SIGNALCHECK ENGINE v9.1 — CALIBRADO REAL
 # ======================================================
 
-print("🔥 ENGINE v9.0 FINAL CALIBRATED OK")
-
-# ======================================================
-# IMPORTS
-# ======================================================
+print("🔥 ENGINE v9.1 CALIBRATED OK")
 
 from backend.Analysis import (
     emotions,
@@ -39,8 +35,7 @@ from backend.confidence_score import compute_confidence
 from backend.utils.analysis_adapter import adapt_dict_to_result
 from backend.text_normalizer import normalize_text
 
-
-MAX_RISK_SCORE = 8.0
+MAX_RISK_SCORE = 6.0   # 🔥 bajamos divisor → mejor distribución
 
 
 # ======================================================
@@ -102,38 +97,42 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
 
     total_points = sum(m.points for m in modules)
 
+    # 🔥 NORMALIZACIÓN MÁS SUAVE
     risk_score = total_points / MAX_RISK_SCORE
 
     # ======================================================
-    # 🔥 COMPENSACIONES (CLAVE)
+    # 🔥 COMPENSACIONES (MUY IMPORTANTES)
     # ======================================================
 
-    # evidencia fuerte baja riesgo
-    risk_score -= evidence.points * 0.9
+    # evidencia fuerte reduce mucho más
+    risk_score -= evidence.points * 1.2
 
     # autoridad fuerte reduce riesgo
     if authority.points < 0:
-        risk_score += authority.points * 0.4
+        risk_score += authority.points * 0.6
 
-    # fuente confiable reduce riesgo
-    if source_info.get("trust_level", 0.5) > 0.8:
-        risk_score *= 0.8
+    # fuente confiable reduce bastante
+    trust = source_info.get("trust_level", 0.5)
+    if trust > 0.8:
+        risk_score *= 0.75
+    elif trust < 0.4:
+        risk_score *= 1.1
 
     # ======================================================
-    # BOOSTS CONTROLADOS
+    # BOOSTS CONTROLADOS (BAJAMOS AGRESIVIDAD)
     # ======================================================
 
     if contradictions.points > 0.5:
-        risk_score += 0.12
-
-    if headline_gap.points > 0.5:
-        risk_score += 0.10
-
-    if framing.points > 0.6:
         risk_score += 0.08
 
+    if headline_gap.points > 0.5:
+        risk_score += 0.07
+
+    if framing.points > 0.6:
+        risk_score += 0.05
+
     # ======================================================
-    # NORMALIZACIÓN
+    # NORMALIZACIÓN FINAL
     # ======================================================
 
     risk_score = max(0.0, min(risk_score, 1.0))
@@ -163,19 +162,19 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
     risk_score = adjust_score_by_source(risk_score, source_info)
 
     # ======================================================
-    # 🟢 BOOST GLOBAL FINAL (CLAVE)
+    # 🟢 BOOST FINAL INTELIGENTE
     # ======================================================
 
-    if evidence.points > 0.5 and source_info.get("trust_level", 0.5) > 0.7:
-        risk_score *= 0.7
+    if evidence.points > 0.4 and trust > 0.7:
+        risk_score *= 0.65
 
     # ======================================================
     # INSIGHT
     # ======================================================
 
-    if risk_score < 0.35:
+    if risk_score < 0.30:
         insight = "contenido confiable"
-    elif risk_score < 0.65:
+    elif risk_score < 0.60:
         insight = "requiere lectura crítica"
     else:
         insight = "contenido con presión narrativa"
@@ -186,9 +185,9 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
     # LEVEL
     # ======================================================
 
-    if risk_score < 0.35:
+    if risk_score < 0.30:
         level = "low"
-    elif risk_score < 0.65:
+    elif risk_score < 0.60:
         level = "medium"
     else:
         level = "high"
@@ -207,10 +206,6 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
         "total_modules": len(modules)
     }
 
-
-# ======================================================
-# COMPAT
-# ======================================================
 
 def analyze_context(text: str, headline: str = "", body: str = "", url: str = ""):
     return analyze_content(text, headline, body, url)
