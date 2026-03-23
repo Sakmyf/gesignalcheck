@@ -1,5 +1,5 @@
 # ======================================================
-# SOURCE ANALYZER — FIXED VERSION
+# SOURCE ANALYZER — EXPANDED COVERAGE
 # ======================================================
 
 def analyze_source(url: str):
@@ -15,69 +15,115 @@ def analyze_source(url: str):
     u = url.lower()
 
     # --------------------------------------------------
-    # 🟢 ALTA CONFIANZA
+    # 🟢 ALTA CONFIANZA (0.90–0.95)
+    # Institucionales, académicos, organismos internacionales
     # --------------------------------------------------
     high_trust = [
-        "argentina.gob.ar",
-        "gov.ar",
-        "who.int",
-        "un.org",
-        "vatican.va"
+        # Argentina gobierno
+        "argentina.gob.ar", "gov.ar", "gob.ar",
+        # Organismos internacionales
+        "who.int", "un.org", "unesco.org", "paho.org",
+        "worldbank.org", "imf.org", "oas.org",
+        # Religioso institucional
+        "vatican.va",
+        # Académicos genéricos
+        ".edu.ar", ".edu",
+        # Fact-checkers reconocidos
+        "chequeado.com", "snopes.com", "factcheck.org",
+        "fullfact.org", "politifact.com",
     ]
 
     # --------------------------------------------------
-    # 🟡 MEDIA
+    # 🟡 CONFIANZA MEDIA-ALTA (0.72)
+    # Medios establecidos LATAM + internacionales
+    # --------------------------------------------------
+    medium_high_trust = [
+        # Argentina
+        "clarin.com", "lanacion.com.ar", "infobae.com",
+        "pagina12.com.ar", "cronista.com", "ambito.com",
+        "telam.com.ar", "perfil.com",
+        # Internacional
+        "bbc.com", "reuters.com", "apnews.com",
+        "theguardian.com", "elpais.com", "elmundo.es",
+        "nytimes.com", "washingtonpost.com",
+        "dw.com", "france24.com",
+        # LATAM
+        "eluniversal.com", "eltiempo.com", "folha.uol.com.br",
+    ]
+
+    # --------------------------------------------------
+    # 🟡 CONFIANZA MEDIA (0.60)
+    # Medios regionales, blogs con trayectoria, ecommerce conocido
     # --------------------------------------------------
     medium_trust = [
-        "clarin.com",
-        "lanacion.com.ar",
-        "infobae.com"
+        # Ecommerce establecido
+        "mercadolibre.com", "amazon.com", "garbarino.com.ar",
+        "fravega.com", "musimundo.com",
+        # Redes/plataformas
+        "youtube.com", "twitter.com", "x.com",
+        "linkedin.com", "facebook.com",
+        # Medios menores conocidos
+        "cronica.com.ar", "minutouno.com", "eldestape.com.ar",
     ]
 
     # --------------------------------------------------
-    # 🔴 BAJA
+    # 🔴 BAJA CONFIANZA (0.25)
+    # TLDs sospechosos, dominios de spam conocidos
     # --------------------------------------------------
     low_trust = [
-        "cronica.com.ar",
-        ".click",
-        ".xyz",
-        ".top"
+        ".click", ".xyz", ".top", ".tk", ".ml", ".ga", ".cf",
+        "bit.ly", "tinyurl.com", "t.co/",
     ]
 
     # --------------------------------------------------
-    # MATCH
+    # MATCH — orden importa (más específico primero)
     # --------------------------------------------------
 
     for d in high_trust:
         if d in u:
             return {
                 "domain": d,
-                "trust_level": 0.95,
+                "trust_level": 0.92,
                 "type": "high_trust",
-                "signals": ["fuente institucional confiable"]
+                "signals": ["fuente institucional o verificadora confiable"]
+            }
+
+    for d in medium_high_trust:
+        if d in u:
+            return {
+                "domain": d,
+                "trust_level": 0.72,
+                "type": "medium_high_trust",
+                "signals": ["medio de comunicación establecido"]
             }
 
     for d in medium_trust:
         if d in u:
             return {
                 "domain": d,
-                "trust_level": 0.7,
+                "trust_level": 0.60,
                 "type": "medium_trust",
-                "signals": ["medio reconocido"]
+                "signals": ["fuente conocida, contexto variable"]
             }
 
     for d in low_trust:
         if d in u:
             return {
                 "domain": d,
-                "trust_level": 0.3,
+                "trust_level": 0.25,
                 "type": "low_trust",
-                "signals": ["fuente de baja calidad"]
+                "signals": ["dominio o acortador de baja confianza"]
             }
 
+    # --------------------------------------------------
+    # DEFAULT: desconocido → trust neutral-positivo
+    # Antes: 0.5 sin ajuste → acumulaba riesgo
+    # Ahora: 0.55 → leve beneficio de la duda
+    # La mayoría de URLs desconocidas son sitios legítimos
+    # --------------------------------------------------
     return {
         "domain": "unknown",
-        "trust_level": 0.5,
+        "trust_level": 0.55,
         "type": "neutral",
-        "signals": ["fuente no categorizada"]
+        "signals": []   # sin señal → no contamina el output
     }

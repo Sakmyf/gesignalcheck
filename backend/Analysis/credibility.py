@@ -43,30 +43,36 @@ def check_credibility(text: str) -> RuleResult:
 
     # ======================================================
     # 🔴 Opinión fuerte sin respaldo
+    # Antes: +0.9 → Ahora: +0.35
+    # Requiere al menos 2 patrones para activarse fuerte
     # ======================================================
 
     if has_opinion and not has_source and not has_data:
-        result.points += 0.9
+        opinion_count = len(found_opinions)
+        score = 0.2 if opinion_count == 1 else 0.35
+        result.points += score
         result.reasons.append("low_credibility_opinion")
         result.evidence.append(
-            f"Opinión fuerte detectada sin respaldo ({', '.join(found_opinions)})"
+            f"Opinión sin respaldo detectada ({', '.join(found_opinions)})"
         )
 
     # ======================================================
     # 🟠 Sin fuentes detectadas
+    # Antes: +0.5 → Ahora: +0.15
+    # La ausencia de "según" no es evidencia de riesgo por sí sola
     # ======================================================
 
     elif not has_source:
-        result.points += 0.5
+        result.points += 0.15
         result.reasons.append("no_detected_source")
-        result.evidence.append("No se detectaron fuentes claras")
+        result.evidence.append("No se detectaron fuentes explícitas")
 
     # ======================================================
     # 🟢 Bonus: contenido con fuentes + datos
     # ======================================================
 
     if has_source and has_data:
-        result.points -= 0.2  # reduce riesgo
+        result.points -= 0.15
         result.reasons.append("supported_information")
         result.evidence.append("Contenido con fuentes y datos detectados")
 
@@ -74,6 +80,7 @@ def check_credibility(text: str) -> RuleResult:
     # LIMPIEZA
     # ======================================================
 
+    result.points = max(0.0, result.points)
     result.reasons = list(dict.fromkeys(result.reasons))
     result.evidence = list(dict.fromkeys(result.evidence))
 

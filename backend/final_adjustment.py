@@ -4,11 +4,6 @@
 # la respuesta final. No modifica scores ni signals.
 # ==========================================================
 
-# ==========================================================
-# SUMMARY MAP
-# (status, context_key) → texto legible para el frontend
-# ==========================================================
-
 SUMMARY_MAP = {
     ("green",  ""):          "El contenido no presenta patrones estructurales de riesgo.",
     ("yellow", ""):          "El contenido requiere lectura crítica.",
@@ -26,10 +21,6 @@ def apply_context_adjustment(result: dict) -> dict:
     reasons    = result.get("reasons", [])
     indicators = result.get("indicators", [])
 
-    # =========================================
-    # DETECCIÓN
-    # =========================================
-
     has_reconstruction = any("reconstrucción" in r for r in reasons)
     has_dramatization  = any("dramatizada" in r for r in reasons)
     has_emotional      = any("emocional" in r for r in reasons)
@@ -42,15 +33,16 @@ def apply_context_adjustment(result: dict) -> dict:
     )
 
     # =========================================
-    # AJUSTE
+    # FIX: usar "level" (clave real del engine)
+    # antes usaba "status" → siempre None → bug silencioso
     # =========================================
 
-    if has_reconstruction or has_dramatization or has_indicator_flag:
-        # Escala green → yellow si corresponde, nunca baja un nivel
-        if result.get("status") == "green":
-            result["status"] = "yellow"
-            result["label"]  = "requiere lectura crítica"
+    current_level = result.get("level", result.get("status", "yellow"))
 
+    if has_reconstruction or has_dramatization or has_indicator_flag:
+        if current_level == "green":
+            result["level"] = "yellow"
+            result["label"] = "requiere lectura crítica"
         result["context_note"] = "contenido posiblemente recreado o no verificable"
 
     elif has_emotional:
@@ -64,7 +56,8 @@ def apply_context_adjustment(result: dict) -> dict:
 
 def build_summary(result: dict) -> str:
 
-    status = result.get("status", "yellow")
+    # FIX: leer "level" en lugar de "status"
+    status = result.get("level", result.get("status", "yellow"))
     note   = result.get("context_note", "")
 
     if "recreado" in note or "reconstrucción" in note:
@@ -74,4 +67,7 @@ def build_summary(result: dict) -> str:
     else:
         context_key = ""
 
-    return SUMMARY_MAP.get((status, context_key), result.get("label", ""))
+    return SUMMARY_MAP.get(
+        (status, context_key),
+        result.get("message", result.get("label", "Análisis completado."))
+    )
