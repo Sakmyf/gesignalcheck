@@ -1,5 +1,5 @@
 # ======================================================
-# SIGNALCHECK ENGINE v9.0 — FINAL CALIBRATED
+# SIGNALCHECK ENGINE v9.0 — FINAL FINAL
 # ======================================================
 
 print("🔥 ENGINE v9.0 FINAL CALIBRATED OK")
