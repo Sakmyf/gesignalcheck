@@ -1,8 +1,8 @@
 # ======================================================
-# SIGNALCHECK ENGINE v9.1 — CALIBRADO REAL
+# SIGNALCHECK ENGINE v9.2 — CALIBRADO PRO REAL
 # ======================================================
 
-print("🔥 ENGINE v9.1 CALIBRATED OK")
+print("🔥 ENGINE v9.2 CALIBRATED PRO OK")
 
 from backend.Analysis import (
     emotions,
@@ -35,7 +35,8 @@ from backend.confidence_score import compute_confidence
 from backend.utils.analysis_adapter import adapt_dict_to_result
 from backend.text_normalizer import normalize_text
 
-MAX_RISK_SCORE = 6.0   # 🔥 bajamos divisor → mejor distribución
+# 🔥 CLAVE: mayor divisor → menos agresividad
+MAX_RISK_SCORE = 8.0
 
 
 # ======================================================
@@ -46,6 +47,7 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
 
     if not text or len(text.strip()) < 30:
         return {
+            "score": 0.0,
             "risk_score": 0.0,
             "risk_level": "low",
             "confidence": 0.2,
@@ -97,39 +99,49 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
 
     total_points = sum(m.points for m in modules)
 
-    # 🔥 NORMALIZACIÓN MÁS SUAVE
+    # 🔥 NORMALIZACIÓN
     risk_score = total_points / MAX_RISK_SCORE
 
     # ======================================================
-    # 🔥 COMPENSACIONES (MUY IMPORTANTES)
+    # 🔥 COMPENSACIONES FUERTES (CLAVE)
     # ======================================================
 
-    # evidencia fuerte reduce mucho más
-    risk_score -= evidence.points * 1.2
+    # evidencia reduce fuerte
+    risk_score -= evidence.points * 1.4
 
-    # autoridad fuerte reduce riesgo
+    # autoridad fuerte reduce
     if authority.points < 0:
-        risk_score += authority.points * 0.6
+        risk_score += authority.points * 0.8
 
-    # fuente confiable reduce bastante
+    # contenido factual reduce
+    if framing.points < 0:
+        risk_score += framing.points * 0.5
+
+    # ======================================================
+    # FUENTE (MEJORADO)
+    # ======================================================
+
     trust = source_info.get("trust_level", 0.5)
+
     if trust > 0.8:
-        risk_score *= 0.75
+        risk_score *= 0.7
+    elif trust > 0.6:
+        risk_score *= 0.85
     elif trust < 0.4:
         risk_score *= 1.1
 
     # ======================================================
-    # BOOSTS CONTROLADOS (BAJAMOS AGRESIVIDAD)
+    # BOOSTS CONTROLADOS (MUCHO MÁS SUAVES)
     # ======================================================
 
     if contradictions.points > 0.5:
-        risk_score += 0.08
+        risk_score += 0.05
 
     if headline_gap.points > 0.5:
-        risk_score += 0.07
+        risk_score += 0.05
 
     if framing.points > 0.6:
-        risk_score += 0.05
+        risk_score += 0.04
 
     # ======================================================
     # NORMALIZACIÓN FINAL
@@ -162,11 +174,14 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
     risk_score = adjust_score_by_source(risk_score, source_info)
 
     # ======================================================
-    # 🟢 BOOST FINAL INTELIGENTE
+    # 🔥 BOOST POSITIVO FINAL
     # ======================================================
 
     if evidence.points > 0.4 and trust > 0.7:
-        risk_score *= 0.65
+        risk_score *= 0.6
+
+    # clamp final otra vez
+    risk_score = max(0.0, min(risk_score, 1.0))
 
     # ======================================================
     # INSIGHT
@@ -193,6 +208,8 @@ def analyze_content(text: str, headline: str = "", body: str = "", url: str = ""
         level = "high"
 
     return {
+        # 🔥 COMPATIBILIDAD TOTAL CON TU APP
+        "score": round(risk_score, 3),
         "risk_score": round(risk_score, 3),
         "risk_level": level,
         "confidence": round(confidence, 3),
