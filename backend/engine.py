@@ -1,5 +1,5 @@
 # ======================================================
-# SIGNALCHECK ENGINE v9.4 – BALANCED REAL USE
+# SIGNALCHECK ENGINE v9.6 – BALANCED + STABLE
 # ======================================================
 
 from backend.Analysis.credibility import analyze as analyze_credibility
@@ -30,7 +30,7 @@ def analyze_context(text: str, url: str = ""):
     urgency = check_urgency(text)
 
     # ======================================================
-    # NORMALIZACIÓN (COMPATIBLE)
+    # NORMALIZACIÓN SEGURA
     # ======================================================
 
     def get_score(x):
@@ -43,42 +43,53 @@ def analyze_context(text: str, url: str = ""):
             return x.get("signals", [])
         return getattr(x, "reasons", [])
 
+    def normalize(score):
+        # 🔥 clave: evitamos negativos y overflow
+        return max(0.0, min(abs(score), 1.0))
+
     # ======================================================
-    # SCORES (FIX CRÍTICO)
+    # SCORES NORMALIZADOS
     # ======================================================
 
-    narrative_score = get_score(credibility)
-    rhetorical_score = get_score(contradictions)
-    authority_score = get_score(authority)
-    urgency_score = get_score(urgency)
+    narrative_score = normalize(get_score(credibility))
+    rhetorical_score = normalize(get_score(contradictions))
+    authority_score = normalize(get_score(authority))
+    urgency_score = normalize(get_score(urgency))
 
     # ======================================================
     # SCORE BASE (BALANCEADO REAL)
     # ======================================================
+    # 👉 authority RESTA riesgo (clave)
+    # 👉 urgency aporta poco (ruido leve)
 
     risk_score = (
-        narrative_score * 0.2 +
-        rhetorical_score * 0.2 +
-        authority_score * 0.15 +
+        narrative_score * 0.25 +
+        rhetorical_score * 0.25 +
         urgency_score * 0.1
     )
 
+    # autoridad reduce riesgo
+    risk_score -= authority_score * 0.2
+
+    # baseline mínimo (evita todo en 0)
+    risk_score += 0.05
+
     # ======================================================
-    # ANALISIS DE FUENTE (CLAVE REAL)
+    # ANALISIS DE FUENTE
     # ======================================================
 
     source_info = analyze_source(url)
     trust = source_info.get("trust_level", 0.5)
 
-    # ajuste REAL (esto destraba el "todo rojo")
-    if trust >= 0.8:
+    # ajuste progresivo (suave, no agresivo)
+    if trust >= 0.85:
         risk_score *= 0.5
 
-    elif trust >= 0.6:
-        risk_score *= 0.75
+    elif trust >= 0.7:
+        risk_score *= 0.7
 
     elif trust <= 0.3:
-        risk_score *= 1.2
+        risk_score *= 1.25
 
     # ======================================================
     # NORMALIZACIÓN FINAL
@@ -87,20 +98,20 @@ def analyze_context(text: str, url: str = ""):
     risk_score = max(0.0, min(risk_score, 1.0))
 
     # ======================================================
-    # CLASIFICACIÓN REAL (UX IMPORTANTE)
+    # CLASIFICACIÓN (UX CALIBRADA)
     # ======================================================
 
-    if risk_score < 0.35:
+    if risk_score < 0.30:
         level = "green"
-        message = "Contenido con estructura confiable"
+        message = "El contenido no presenta patrones estructurales de riesgo."
 
-    elif risk_score < 0.65:
+    elif risk_score < 0.60:
         level = "yellow"
-        message = "Contenido con señales mixtas"
+        message = "El contenido requiere lectura crítica."
 
     else:
         level = "red"
-        message = "Requiere atención"
+        message = "Se detectan múltiples señales estructurales de riesgo."
 
     # ======================================================
     # SEÑALES
