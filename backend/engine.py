@@ -1,5 +1,6 @@
 # ======================================================
-# SIGNALCHECK ENGINE v10 – PRO BALANCED + CONFIDENCE
+# SIGNALCHECK ENGINE v10 – PRO FINAL
+# Balanced scoring + narrative detection + confidence
 # ======================================================
 
 from backend.Analysis.credibility import analyze as analyze_credibility
@@ -12,6 +13,10 @@ from backend.source_analyzer import analyze_source
 
 def analyze_context(text: str, url: str = ""):
 
+    # ======================================================
+    # VALIDACIÓN
+    # ======================================================
+
     if not text or len(text.strip()) < 30:
         return {
             "score": 0.0,
@@ -20,6 +25,8 @@ def analyze_context(text: str, url: str = ""):
             "message": "Contenido insuficiente",
             "signals": []
         }
+
+    text_lower = text.lower()
 
     # ======================================================
     # ANALISIS BASE
@@ -58,7 +65,7 @@ def analyze_context(text: str, url: str = ""):
     trust = source_info.get("trust_level", 0.5)
 
     # ======================================================
-    # RISK SCORE (equilibrado real)
+    # RISK SCORE BASE
     # ======================================================
 
     risk_score = (
@@ -70,10 +77,44 @@ def analyze_context(text: str, url: str = ""):
     )
 
     # ======================================================
-    # AJUSTES INTELIGENTES (clave UX)
+    # DETECCIÓN NARRATIVA (CLAVE)
     # ======================================================
 
-    # si hay señales múltiples → sube riesgo
+    fiction_patterns = [
+        "escena imaginada",
+        "relato",
+        "según versiones",
+        "se dice que",
+        "tras la escena",
+        "generó impacto",
+        "desató una ola",
+        "nadie esperaba",
+        "sorprendió a todos"
+    ]
+
+    fiction_hits = [p for p in fiction_patterns if p in text_lower]
+
+    if fiction_hits:
+        risk_score += 0.25
+
+    # ======================================================
+    # DETECCIÓN EMOCIONAL
+    # ======================================================
+
+    emotion_words = [
+        "indignación", "furia", "escándalo",
+        "caos", "impacto", "tensión", "controversia"
+    ]
+
+    emotion_hits = [w for w in emotion_words if w in text_lower]
+
+    if len(emotion_hits) >= 2:
+        risk_score += 0.15
+
+    # ======================================================
+    # AJUSTES POR SEÑALES
+    # ======================================================
+
     signal_count = (
         len(get_signals(credibility)) +
         len(get_signals(contradictions)) +
@@ -84,7 +125,7 @@ def analyze_context(text: str, url: str = ""):
     if signal_count >= 3:
         risk_score += 0.1
 
-    # contenido demasiado emocional
+    # combinación peligrosa
     if urgency_score > 0.4 and credibility_score > 0.3:
         risk_score += 0.1
 
@@ -95,7 +136,7 @@ def analyze_context(text: str, url: str = ""):
     risk_score = max(0.0, min(risk_score, 1.0))
 
     # ======================================================
-    # CONFIDENCE SCORE (nuevo PRO)
+    # CONFIDENCE SCORE (PRO)
     # ======================================================
 
     confidence_score = (
@@ -108,14 +149,14 @@ def analyze_context(text: str, url: str = ""):
     confidence_score = max(0.0, min(confidence_score, 1.0))
 
     # ======================================================
-    # CLASIFICACIÓN UX REAL
+    # CLASIFICACIÓN UX
     # ======================================================
 
-    if risk_score < 0.3:
+    if risk_score < 0.30:
         level = "green"
         message = "Bajo riesgo estructural"
 
-    elif risk_score < 0.6:
+    elif risk_score < 0.60:
         level = "yellow"
         message = "Contenido con señales mixtas"
 
@@ -132,11 +173,13 @@ def analyze_context(text: str, url: str = ""):
         get_signals(contradictions) +
         get_signals(authority) +
         get_signals(urgency) +
-        source_info.get("signals", [])
+        source_info.get("signals", []) +
+        fiction_hits +
+        emotion_hits
     ))[:6]
 
     # ======================================================
-    # OUTPUT PRO
+    # OUTPUT FINAL
     # ======================================================
 
     return {
