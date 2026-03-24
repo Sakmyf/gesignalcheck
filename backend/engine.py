@@ -1,5 +1,5 @@
 # ======================================================
-# SIGNALCHECK ENGINE v9.6 – BALANCED + STABLE
+# SIGNALCHECK ENGINE v9.7 – FINAL STABLE + CONTEXT
 # ======================================================
 
 from backend.Analysis.credibility import analyze as analyze_credibility
@@ -44,7 +44,6 @@ def analyze_context(text: str, url: str = ""):
         return getattr(x, "reasons", [])
 
     def normalize(score):
-        # 🔥 clave: evitamos negativos y overflow
         return max(0.0, min(abs(score), 1.0))
 
     # ======================================================
@@ -57,10 +56,9 @@ def analyze_context(text: str, url: str = ""):
     urgency_score = normalize(get_score(urgency))
 
     # ======================================================
-    # SCORE BASE (BALANCEADO REAL)
+    # SCORE BASE
     # ======================================================
-    # 👉 authority RESTA riesgo (clave)
-    # 👉 urgency aporta poco (ruido leve)
+    # authority RESTA riesgo (clave)
 
     risk_score = (
         narrative_score * 0.25 +
@@ -68,10 +66,10 @@ def analyze_context(text: str, url: str = ""):
         urgency_score * 0.1
     )
 
-    # autoridad reduce riesgo
+    # resta por autoridad
     risk_score -= authority_score * 0.2
 
-    # baseline mínimo (evita todo en 0)
+    # baseline mínimo
     risk_score += 0.05
 
     # ======================================================
@@ -80,8 +78,10 @@ def analyze_context(text: str, url: str = ""):
 
     source_info = analyze_source(url)
     trust = source_info.get("trust_level", 0.5)
+    domain = source_info.get("domain", "").lower()
+    source_type = source_info.get("type", "")
 
-    # ajuste progresivo (suave, no agresivo)
+    # ajuste por confianza
     if trust >= 0.85:
         risk_score *= 0.5
 
@@ -92,13 +92,26 @@ def analyze_context(text: str, url: str = ""):
         risk_score *= 1.25
 
     # ======================================================
+    # CONTEXT AWARE (CLAVE PRO)
+    # ======================================================
+
+    if "facebook" in domain or "twitter" in domain or "instagram" in domain:
+        risk_score *= 0.9  # redes más flexibles
+
+    elif ".gov" in domain:
+        risk_score *= 1.1  # gobierno más exigente
+
+    elif source_type == "recognized_media":
+        risk_score *= 1.05  # medios un poco más exigentes
+
+    # ======================================================
     # NORMALIZACIÓN FINAL
     # ======================================================
 
     risk_score = max(0.0, min(risk_score, 1.0))
 
     # ======================================================
-    # CLASIFICACIÓN (UX CALIBRADA)
+    # CLASIFICACIÓN FINAL
     # ======================================================
 
     if risk_score < 0.30:
