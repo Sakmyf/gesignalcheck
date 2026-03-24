@@ -1,7 +1,8 @@
 # ==========================================================
 # FINAL ADJUSTMENT LAYER
 # Opera sobre el resultado del engine antes de construir
-# la respuesta final. No modifica scores ni signals.
+# la respuesta final. No modifica scores.
+# FIX P0: leer "signals" (clave real del engine, no "reasons"/"indicators")
 # ==========================================================
 
 SUMMARY_MAP = {
@@ -11,38 +12,35 @@ SUMMARY_MAP = {
     ("green",  "recreado"):  "Contenido posiblemente recreado. Verificá las fuentes.",
     ("yellow", "recreado"):  "Contenido con indicios de reconstrucción no verificable.",
     ("red",    "recreado"):  "Alta presión narrativa con indicios de reconstrucción.",
+    ("green",  "emocional"): "Contenido con carga emocional. Verificá las fuentes.",  # FIX: entrada faltante
     ("yellow", "emocional"): "Lenguaje con carga emocional elevada.",
     ("red",    "emocional"): "Alta presión emocional y narrativa combinadas.",
 }
 
+# Palabras clave a buscar en los signals del engine
+_RECONSTRUCTION_KEYWORDS = ("reconstrucción", "recreado", "dramatizada", "hypothetical")
+_EMOTIONAL_KEYWORDS       = ("emocional", "emoción", "emotion", "urgency_pressure")
+
 
 def apply_context_adjustment(result: dict) -> dict:
 
-    reasons    = result.get("reasons", [])
-    indicators = result.get("indicators", [])
+    # FIX P0: el engine devuelve "signals", no "reasons" ni "indicators"
+    signals = result.get("signals", [])
 
-    has_reconstruction = any("reconstrucción" in r for r in reasons)
-    has_dramatization  = any("dramatizada" in r for r in reasons)
-    has_emotional      = any("emocional" in r for r in reasons)
-
-    has_indicator_flag = any(
-        "reconstrucción" in i.get("title", "").lower() or
-        "dramatizada" in i.get("title", "").lower()
-        for i in indicators
-        if isinstance(i, dict)
+    has_reconstruction = any(
+        any(kw in s.lower() for kw in _RECONSTRUCTION_KEYWORDS)
+        for s in signals
+    )
+    has_emotional = any(
+        any(kw in s.lower() for kw in _EMOTIONAL_KEYWORDS)
+        for s in signals
     )
 
-    # =========================================
-    # FIX: usar "level" (clave real del engine)
-    # antes usaba "status" → siempre None → bug silencioso
-    # =========================================
+    current_level = result.get("level", "yellow")
 
-    current_level = result.get("level", result.get("status", "yellow"))
-
-    if has_reconstruction or has_dramatization or has_indicator_flag:
+    if has_reconstruction:
         if current_level == "green":
             result["level"] = "yellow"
-            result["label"] = "requiere lectura crítica"
         result["context_note"] = "contenido posiblemente recreado o no verificable"
 
     elif has_emotional:
@@ -56,8 +54,7 @@ def apply_context_adjustment(result: dict) -> dict:
 
 def build_summary(result: dict) -> str:
 
-    # FIX: leer "level" en lugar de "status"
-    status = result.get("level", result.get("status", "yellow"))
+    status = result.get("level", "yellow")
     note   = result.get("context_note", "")
 
     if "recreado" in note or "reconstrucción" in note:
@@ -69,5 +66,5 @@ def build_summary(result: dict) -> str:
 
     return SUMMARY_MAP.get(
         (status, context_key),
-        result.get("message", result.get("label", "Análisis completado."))
+        result.get("message", "Análisis completado.")
     )

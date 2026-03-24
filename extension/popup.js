@@ -62,6 +62,12 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
           }
 
+          if (res.status === 429) {
+            labelBadge.textContent = "Límite de análisis alcanzado";
+            stopScanUI();
+            return;
+          }
+
           if (!res.ok) throw new Error("Servidor");
 
           const data = await res.json();
@@ -89,14 +95,14 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderResult(data) {
 
     const analysis = data.analysis || data;
-    const level = (analysis.level || "low").toLowerCase();
+    const level = (analysis.level || "medio").toLowerCase();
 
     labelBadge.textContent =
-      level === "low" ? "Bajo riesgo" :
-      level === "high" ? "Alto riesgo" :
+      level === "bajo" ? "Bajo riesgo" :
+      level === "alto" ? "Alto riesgo" :
       "Requiere atención";
 
-    labelBadge.className = `signal-label badge-${level === "low" ? "low" : "high"}`;
+    labelBadge.className = `signal-label badge-${level === "bajo" ? "low" : "high"}`;
 
     summaryBox.textContent =
       analysis.insight ||

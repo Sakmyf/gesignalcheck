@@ -14,10 +14,11 @@ def analyze_context(text: str, url: str = ""):
 
     if not text:
         return {
-            "score": 0.0,
-            "level": "green",
+            "score":   0.0,
+            "level":   "green",
             "signals": [],
-            "message": "Sin contenido"
+            "message": "Sin contenido",
+            "_scores": {}
         }
 
     # ======================================================
@@ -51,25 +52,29 @@ def analyze_context(text: str, url: str = ""):
     # SCORES NORMALIZADOS
     # ======================================================
 
-    narrative_score = normalize(get_score(credibility))
-    rhetorical_score = normalize(get_score(contradictions))
-    authority_score = normalize(get_score(authority))
-    urgency_score = normalize(get_score(urgency))
+    narrative_score   = normalize(get_score(credibility))
+    rhetorical_score  = normalize(get_score(contradictions))
+    urgency_score     = normalize(get_score(urgency))
+
+    # FIX P0: authority tiene dos efectos separados.
+    # authority_risk  → autoridad débil suma riesgo
+    # authority_bonus → autoridad fuerte resta riesgo
+    authority_risk  = normalize(authority.get("score",       0.0) if isinstance(authority, dict) else getattr(authority, "points", 0.0))
+    authority_bonus = normalize(authority.get("trust_bonus", 0.0) if isinstance(authority, dict) else 0.0)
 
     # ======================================================
-    # SCORE BASE (BALANCEADO REAL)
+    # SCORE BASE
     # ======================================================
-    # 👉 authority RESTA riesgo (clave)
-    # 👉 urgency aporta poco (ruido leve)
 
     risk_score = (
-        narrative_score * 0.25 +
+        narrative_score  * 0.25 +
         rhetorical_score * 0.25 +
-        urgency_score * 0.1
+        urgency_score    * 0.10 +
+        authority_risk   * 0.15   # autoridad vaga contribuye al riesgo
     )
 
-    # autoridad reduce riesgo
-    risk_score -= authority_score * 0.2
+    # autoridad concreta reduce riesgo
+    risk_score -= authority_bonus * 0.20
 
     # baseline mínimo (evita todo en 0)
     risk_score += 0.05
@@ -132,9 +137,19 @@ def analyze_context(text: str, url: str = ""):
     # ======================================================
 
     return {
-        "score": round(risk_score, 2),
-        "level": level,
+        "score":   round(risk_score, 2),
+        "level":   level,
         "message": message,
         "signals": signals,
-        "source": source_info
+        "source":  source_info,
+        # Scores individuales — uso interno (DB/analytics).
+        # No se exponen en el response al cliente.
+        "_scores": {
+            "narrative":       round(narrative_score,  2),
+            "rhetorical":      round(rhetorical_score, 2),
+            "urgency":         round(urgency_score,    2),
+            "authority_risk":  round(authority_risk,   2),
+            "authority_bonus": round(authority_bonus,  2),
+            "source_trust":    round(trust,            2),
+        }
     }

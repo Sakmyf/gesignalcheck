@@ -84,7 +84,8 @@ class AnalysisLog(Base):
     premium_requested = Column(Boolean, default=False)
 
     engine_version = Column(String(20))
-    analysis_key = Column(String(255), nullable=True, index=True)  
+    analysis_key   = Column(String(255), nullable=True, index=True)
+    response_json  = Column(Text, nullable=True)  # P1-A: cache completo del response
 
 # ============================
 # EXTENSIONES AUTORIZADAS
