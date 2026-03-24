@@ -1,116 +1,99 @@
 # ======================================================
-# SIGNALCHECK – CREDIBILITY ANALYZER PRO v1.0
-# Detecta narrativa emocional, exageración y fake patterns
+# SIGNALCHECK – CREDIBILITY ANALYZER PRO v2 (REAL WORLD)
 # ======================================================
 
 import re
 
-# ======================================================
-# PATRONES CLAVE
-# ======================================================
-
-EMOTIONAL_PATTERNS = [
-    r"incre[ií]ble",
-    r"impactante",
-    r"no lo vas a creer",
-    r"te va a sorprender",
-    r"brutal",
-    r"explota",
-    r"estall[oó]",
-    r"esc[aá]ndalo",
-]
-
-DRAMA_PATTERNS = [
-    r"no pod[ií]a creer",
-    r"qued[oó] en shock",
-    r"paraliz[ao]",
-    r"nadie lo esperaba",
-    r"todo cambi[oó]",
-    r"gener[oó] caos",
-]
-
-STORYTELLING_PATTERNS = [
-    r"con esta frase",
-    r"lo que parec[ií]a",
-    r"todo comenz[oó]",
-    r"en ese momento",
-    r"de repente",
-    r"finalmente",
-]
-
-ABSOLUTE_PATTERNS = [
-    r"todos",
-    r"nadie",
-    r"siempre",
-    r"nunca",
-    r"definitivamente",
-    r"sin dudas",
-]
-
-# ======================================================
-# ANALIZADOR PRINCIPAL
-# ======================================================
-
 def analyze(text: str):
 
     if not text:
-        return {
-            "score": 0.0,
-            "signals": []
-        }
+        return {"score": 0.0, "signals": []}
 
-    text = text.lower()
+    text_lower = text.lower()
 
     score = 0.0
     signals = []
 
     # ======================================================
-    # EMOCIONALIDAD
+    # DETECCIÓN EMOCIONAL (AMPLIADA)
     # ======================================================
 
-    emotional_hits = sum(len(re.findall(p, text)) for p in EMOTIONAL_PATTERNS)
+    emotional_words = [
+        "increible", "impactante", "brutal", "terrible",
+        "impresionante", "explota", "escandalo",
+        "shock", "indignacion", "caos", "furia"
+    ]
+
+    emotional_hits = sum(1 for w in emotional_words if w in text_lower)
 
     if emotional_hits > 0:
-        score += min(emotional_hits * 0.08, 0.25)
+        score += min(0.1 * emotional_hits, 0.4)
         signals.append("lenguaje emocional")
 
     # ======================================================
-    # DRAMATIZACIÓN
+    # DRAMATIZACIÓN (CLAVE)
     # ======================================================
 
-    drama_hits = sum(len(re.findall(p, text)) for p in DRAMA_PATTERNS)
+    drama_patterns = [
+        "no podia creer",
+        "quedo en shock",
+        "dejo paralizada",
+        "genero caos",
+        "nadie lo esperaba",
+        "todo cambio",
+        "situacion tensa",
+    ]
+
+    drama_hits = sum(1 for p in drama_patterns if p in text_lower)
 
     if drama_hits > 0:
-        score += min(drama_hits * 0.1, 0.3)
-        signals.append("dramatización narrativa")
+        score += min(0.15 * drama_hits, 0.4)
+        signals.append("dramatizacion")
 
     # ======================================================
-    # STORYTELLING SOSPECHOSO
+    # STORYTELLING NARRATIVO (MUY IMPORTANTE)
     # ======================================================
 
-    story_hits = sum(len(re.findall(p, text)) for p in STORYTELLING_PATTERNS)
+    storytelling_patterns = [
+        "con esta frase",
+        "lo que parecia",
+        "en ese momento",
+        "de repente",
+        "finalmente",
+        "dentro de este relato",
+    ]
 
-    if story_hits >= 2:
+    story_hits = sum(1 for p in storytelling_patterns if p in text_lower)
+
+    if story_hits >= 1:
+        score += 0.2
+        signals.append("estructura narrativa")
+
+    # ======================================================
+    # FRASES LARGAS (SEÑAL REAL DE STORYTELLING)
+    # ======================================================
+
+    sentences = text.split(".")
+    long_sentences = [s for s in sentences if len(s.split()) > 20]
+
+    if len(long_sentences) >= 2:
         score += 0.15
-        signals.append("estructura narrativa artificial")
+        signals.append("narrativa extensa")
 
     # ======================================================
-    # ABSOLUTOS (SEÑAL CLAVE)
+    # EXCESO DE ADJETIVOS (heurística fuerte)
     # ======================================================
 
-    absolute_hits = sum(len(re.findall(p, text)) for p in ABSOLUTE_PATTERNS)
+    adjectives = [
+        "increible", "impactante", "terrible", "impresionante",
+        "inesperado", "fuerte", "brutal"
+    ]
 
-    if absolute_hits > 1:
-        score += 0.1
-        signals.append("afirmaciones absolutas")
+    adj_hits = sum(1 for w in adjectives if w in text_lower)
 
-    # ======================================================
-    # TEXTO MUY CARGADO (heurística real)
-    # ======================================================
-
-    if len(text) > 400 and (emotional_hits + drama_hits) > 2:
+    if adj_hits >= 2:
         score += 0.15
-        signals.append("narrativa cargada")
+        signals.append("exceso de adjetivos")
 
     # ======================================================
     # NORMALIZACIÓN FINAL
