@@ -10,7 +10,7 @@ from backend.Analysis.credibility        import analyze          as analyze_cred
 from backend.Analysis.contradictions     import analyze_contradictions
 from backend.Analysis.authority          import analyze_authority
 from backend.Analysis.urgency            import check_urgency
-from backend.Analysis.emotions           import check_emotions
+from backend.Analysis.emotions           import analyze as check_emotions
 from backend.Analysis.polarization       import check_polarization
 from backend.Analysis.misinformation     import check_misinformation
 from backend.Analysis.scientific_claims  import check_scientific_claims
