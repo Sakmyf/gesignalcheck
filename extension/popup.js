@@ -1,5 +1,4 @@
 const API_URL = "https://gesignalcheck-production-8e78.up.railway.app/v3/verify";
-const EXT_ID = "dpgnanocamaeieplhgnapgcannjcpghn";
 
 document.addEventListener("DOMContentLoaded", () => {
 
