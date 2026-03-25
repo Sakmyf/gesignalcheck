@@ -1,45 +1,28 @@
-# emotions.py
+# ======================================================
+# EMOTIONS MODULE — ADAPTADO A ENGINE v8.7
+# ======================================================
 
 import re
-from backend.Analysis.rules_types import RuleResult
+from backend.Analysis.base import AnalysisResult
 
 
 EMOTION_PATTERNS = [
-    r"indignación",
-    r"furia",
-    r"caos",
-    r"paralizada",
-    r"ataque",
-    r"escándalo",
-    r"explosión",
-    r"estalló",
-    r"imparable",
-    r"terrible",
-    r"alarmante",
-    r"no vuelvas a",
+    r"cansado de",
+    r"merecés",
+    r"tu vida va a cambiar",
+    r"libertad financiera",
+    r"viví como soñás",
 ]
 
 
-def check_emotions(text: str) -> RuleResult:
+def analyze(text: str) -> AnalysisResult:
 
-    result = RuleResult()
+    result = AnalysisResult()
 
-    text_lower = text.lower()
-
-    matches = [p for p in EMOTION_PATTERNS if re.search(p, text_lower)]
-
-    if matches:
-
-        score = min(1.0, len(matches) * 0.2)
-
-        result.points += score
-        result.reasons.append("emotional_intensity")
-        result.evidence.append(
-            f"Lenguaje emocional detectado ({len(matches)} señales)"
-        )
+    for p in EMOTION_PATTERNS:
+        if re.search(p, text, re.I):
+            result.points -= 0.15
+            result.reasons.append("manipulación emocional")
+            result.evidence.append(p)
 
     return result
-
-
-def analyze(text: str):
-    return check_emotions(text)
