@@ -107,7 +107,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // =========================
-  // RENDER RESULT (PRO READY)
+  // RENDER RESULT (FIX FINAL)
   // =========================
 
   function renderResult(data) {
@@ -115,8 +115,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const analysis = data.analysis || data;
 
     const level      = (analysis.level || "yellow").toLowerCase();
-    const score      = analysis.structural_index;
-    const confidence = analysis.confidence;
+    const score      = analysis.score;        // ✅ FIX CLAVE
+    const confidence = analysis.confidence;   // ✅ FIX CLAVE
 
     // =========================
     // BADGE
@@ -148,7 +148,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // =========================
 
     if (confEl && confidence !== undefined) {
-      confEl.textContent = Math.round(confidence * 100);
+      confEl.textContent = Math.round(confidence); // ✅ NO multiplicar
     }
 
     // =========================
