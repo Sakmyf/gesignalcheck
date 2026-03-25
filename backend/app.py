@@ -1,8 +1,4 @@
-print("APP FILE ACTUAL 12.0 - calibrated scoring FIXED")
-
-# ==========================================================
-# IMPORTS
-# ==========================================================
+print("APP FILE ACTUAL 12.1 - engine v12 integrated")
 
 import os
 import json
@@ -23,18 +19,9 @@ from backend.utils.content_versioning import (
     build_analysis_key,
 )
 
-# ==========================================================
-# VERSION CONTROL
-# ==========================================================
-
 API_VERSION    = "v3"
-ENGINE_VERSION = "v9.6"
+ENGINE_VERSION = "v12.0"
 PROMPT_VERSION = "none"
-
-# ==========================================================
-# PLAN LIMITS (P1-C)
-# 0 = sin límite (pro / enterprise / beta abierta)
-# ==========================================================
 
 PLAN_LIMITS = {
     "free":       50,
@@ -42,51 +29,31 @@ PLAN_LIMITS = {
     "enterprise":  0,
 }
 
-# ==========================================================
-# FASTAPI INIT
-# ==========================================================
-
-app = FastAPI(title="GE SignalCheck API v8 - Stable")
-
-# ==========================================================
-# CORS
-# ==========================================================
+app = FastAPI(title="GE SignalCheck API — v12")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # desarrollo abierto
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ==========================================================
-# DB INIT
-# ==========================================================
-
 @app.on_event("startup")
 def startup_event():
     Base.metadata.create_all(bind=engine)
-
-# ==========================================================
-# INPUT MODEL
-# ==========================================================
 
 class VerifyRequest(BaseModel):
     url: str
     text: str
 
-# ==========================================================
-# ROOT
-# ==========================================================
-
 @app.get("/")
 def root():
-    return {"status": "GE SignalCheck API online"}
+    return {"status": "GE SignalCheck API online", "engine": ENGINE_VERSION}
 
-# ==========================================================
-# VERIFY ENDPOINT
-# ==========================================================
+@app.get("/health")
+def health():
+    return {"status": "ok", "engine": ENGINE_VERSION}
 
 @app.post("/v3/verify")
 async def verify(
@@ -94,11 +61,6 @@ async def verify(
     x_extension_id: str = Header(None),
     db: Session = Depends(get_db)
 ):
-
-    # ======================================================
-    # VALIDACIÓN EXTENSIÓN
-    # ======================================================
-
     if not x_extension_id:
         raise HTTPException(status_code=401, detail="Extensión no identificada")
 
@@ -106,7 +68,6 @@ async def verify(
         Extension.extension_id == x_extension_id.strip()
     ).first()
 
-    # AUTO REGISTRO
     if not extension:
         extension = Extension(
             extension_id=x_extension_id.strip(),
@@ -128,25 +89,13 @@ async def verify(
     text = data.text
     url  = data.url or ""
 
-    # ======================================================
-    # HASH + CACHE KEY
-    # ======================================================
-
     content_hash = generate_content_hash(text)
-
     analysis_key = build_analysis_key(
         url=url,
         content_hash=content_hash,
         engine_version=ENGINE_VERSION,
         prompt_version=PROMPT_VERSION
     )
-
-    # ======================================================
-    # CACHE LOOKUP (P1-A)
-    # Si existe un log con este key y tiene response_json guardado
-    # → retornar directo. No corre el análisis, no toca analyses_used.
-    # El plan en meta se actualiza al plan actual por si cambió.
-    # ======================================================
 
     cached_log = db.query(AnalysisLog).filter(
         AnalysisLog.analysis_key == analysis_key
@@ -159,13 +108,7 @@ async def verify(
             cached_response["meta"]["plan"]   = extension.plan
             return cached_response
         except Exception:
-            pass  # JSON corrupto → continuar con análisis fresco
-
-    # ======================================================
-    # LIMIT CHECK (P1-C)
-    # Solo corre si no hubo cache hit.
-    # 0 = sin límite (pro / enterprise / beta).
-    # ======================================================
+            pass
 
     if extension.analyses_limit > 0 and extension.analyses_used >= extension.analyses_limit:
         raise HTTPException(
@@ -178,77 +121,58 @@ async def verify(
             }
         )
 
-    # ======================================================
-    # 🔥 ANALYSIS CORE (PROTEGIDO)
-    # ======================================================
-
     try:
         result = analyze_context(text, url)
-
-        # Ajuste final
         result = apply_context_adjustment(result)
 
-        # Score limpio
         score = float(result.get("score", 0))
-
-        # ==================================================
-        # FIX P0: respetar el nivel ajustado por apply_context_adjustment.
-        # Antes se recalculaba desde score → borraba upgrades green→yellow.
-        # El engine ya clasifica por los mismos umbrales (0.30 / 0.60),
-        # apply_context_adjustment puede subir el nivel → hay que leerlo.
-        # ==================================================
 
         _LEVEL_MAP = {
             "green":  ("green",  "bajo"),
             "yellow": ("yellow", "medio"),
             "red":    ("red",    "alto"),
         }
-        adjusted_level               = result.get("level", "yellow")
-        status_color, level          = _LEVEL_MAP.get(adjusted_level, ("yellow", "medio"))
+        adjusted_level      = result.get("level", "yellow")
+        status_color, level = _LEVEL_MAP.get(adjusted_level, ("yellow", "medio"))
 
-        summary = build_summary(result)
+        summary    = build_summary(result)
+        insight    = result.get("insight", "")
+        confidence = result.get("confidence", 0.0)
+        context    = result.get("context", "general")
 
     except Exception as e:
         print("🔥 ERROR EN ANALISIS:", str(e))
-
-        score = 0.0
-        result = {
-            "score": 0,
-            "signals": [],
-            "context_note": "No se pudo analizar el contenido"
-        }
-
-        summary = "No se pudo completar el análisis."
+        score        = 0.0
+        result       = {"score": 0, "signals": [], "context_note": "Error en análisis"}
+        summary      = "No se pudo completar el análisis."
+        insight      = ""
+        confidence   = 0.0
+        context      = "general"
         status_color = "yellow"
-        level = "medio"
-
-    # ======================================================
-    # INDICADORES
-    # ======================================================
+        level        = "medio"
 
     indicators = [
         {
-            "title": s,
+            "title":       s,
             "explanation": "Señal estructural detectada",
             "orientation": "alerta" if status_color != "green" else "neutro"
         }
         for s in result.get("signals", [])[:5]
     ]
 
-    # ======================================================
-    # RESPONSE FINAL (P1-A)
-    # Extraído como variable para poder serializarlo al guardar en DB.
-    # ======================================================
-
     response_payload = {
         "analysis": {
             "level":            level,
             "summary":          summary,
+            "insight":          insight,
+            "confidence":       confidence,
+            "context":          context,
             "indicators":       indicators,
             "shown_indicators": len(indicators),
             "structural_index": score,
             "context_note":     result.get("context_note", ""),
-            "status_color":     status_color
+            "status_color":     status_color,
+            "pro":              result.get("pro", {})
         },
         "meta": {
             "engine_version": ENGINE_VERSION,
@@ -259,28 +183,21 @@ async def verify(
         }
     }
 
-    # ======================================================
-    # GUARDADO DB
-    # ======================================================
-
-    # Leer scores individuales del engine (P1-B).
-    # Fallback a 0.0 si el campo no existe (ej: error en análisis).
-    _s = result.get("_scores", {})
+    _s = result.get("pro", {}).get("_scores", {})
 
     try:
         analysis_log = AnalysisLog(
             trust_score      = _s.get("source_trust",   0.0),
-            narrative_score  = _s.get("narrative",      0.0),
-            rhetorical_score = _s.get("rhetorical",     0.0),
+            narrative_score  = _s.get("credibility",    0.0),
+            rhetorical_score = _s.get("misinformation", 0.0),
             absence_score    = _s.get("urgency",        0.0),
             risk_index       = score,
             level            = level,
             premium_requested= False,
             engine_version   = ENGINE_VERSION,
             analysis_key     = analysis_key,
-            response_json    = json.dumps(response_payload)  # P1-A
+            response_json    = json.dumps(response_payload)
         )
-
         db.add(analysis_log)
         extension.analyses_used += 1
         db.commit()
