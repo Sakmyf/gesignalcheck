@@ -1,6 +1,5 @@
 # ======================================================
-# SIGNALCHECK ENGINE v10 – PRO FINAL
-# Balanced scoring + narrative detection + confidence
+# SIGNALCHECK ENGINE v11 – CONTEXT AWARE PRO
 # ======================================================
 
 from backend.Analysis.credibility import analyze as analyze_credibility
@@ -13,35 +12,24 @@ from backend.source_analyzer import analyze_source
 
 def analyze_context(text: str, url: str = ""):
 
-    # ======================================================
-    # VALIDACIÓN
-    # ======================================================
-
-    if not text or len(text.strip()) < 30:
+    if not text:
         return {
             "score": 0.0,
-            "confidence": 0.0,
             "level": "green",
-            "message": "Contenido insuficiente",
+            "message": "Sin contenido",
             "signals": []
         }
 
     text_lower = text.lower()
 
     # ======================================================
-    # ANALISIS BASE
+    # ANALISIS BASE (STRUCTURAL CORE)
     # ======================================================
 
     credibility = analyze_credibility(text)
     contradictions = analyze_contradictions(text)
     authority = analyze_authority(text)
     urgency = check_urgency(text)
-
-    source_info = analyze_source(url)
-
-    # ======================================================
-    # HELPERS
-    # ======================================================
 
     def get_score(x):
         if isinstance(x, dict):
@@ -53,110 +41,126 @@ def analyze_context(text: str, url: str = ""):
             return x.get("signals", [])
         return getattr(x, "reasons", [])
 
-    # ======================================================
-    # SCORES BASE
-    # ======================================================
-
-    credibility_score = get_score(credibility)
-    contradiction_score = get_score(contradictions)
+    narrative_score = get_score(credibility)
+    rhetorical_score = get_score(contradictions)
     authority_score = get_score(authority)
     urgency_score = get_score(urgency)
 
-    trust = source_info.get("trust_level", 0.5)
-
     # ======================================================
-    # RISK SCORE BASE
+    # SCORE BASE
     # ======================================================
 
     risk_score = (
-        credibility_score * 0.30 +
-        contradiction_score * 0.25 +
-        authority_score * 0.20 +
-        urgency_score * 0.15 +
-        (1 - trust) * 0.10
+        narrative_score * 0.25 +
+        rhetorical_score * 0.25 +
+        authority_score * 0.15 +
+        urgency_score * 0.1
     )
 
     # ======================================================
-    # DETECCIÓN NARRATIVA (CLAVE)
+    # ANALISIS DE FUENTE
     # ======================================================
 
+    source_info = analyze_source(url)
+    trust = source_info.get("trust_level", 0.5)
+
+    if trust >= 0.8:
+        risk_score *= 0.5
+    elif trust >= 0.6:
+        risk_score *= 0.75
+    elif trust <= 0.3:
+        risk_score *= 1.25
+
+    # ======================================================
+    # CONTEXT INTELLIGENCE (CLAVE REAL)
+    # ======================================================
+
+    context_signals = []
+
+    # 🔴 EVENTOS IMPROBABLES / SENSACIONALISMO
+    weird_patterns = [
+        "nadie lo puede creer",
+        "insólito",
+        "increíble",
+        "impensado",
+        "escena nunca vista",
+        "dejó a todos en shock",
+        "algo nunca antes visto",
+        "defecar en la mesa",
+        "situación absurda"
+    ]
+
+    weird_hits = [p for p in weird_patterns if p in text_lower]
+
+    if weird_hits:
+        risk_score += 0.3
+        context_signals.append("evento_improbable")
+
+    # 🟡 DETECCIÓN DE FACT-CHECK
+    factcheck_patterns = [
+        "no es cierto",
+        "esto es falso",
+        "fake",
+        "bulo",
+        "desmentimos",
+        "verificación",
+        "fact-check",
+        "no ocurrió"
+    ]
+
+    factcheck_hits = [p for p in factcheck_patterns if p in text_lower]
+
+    if factcheck_hits:
+        risk_score -= 0.25
+        context_signals.append("fact_check")
+
+    # 🔵 DETECCIÓN DE NARRATIVA FICTICIA / DRAMATIZADA
     fiction_patterns = [
         "escena imaginada",
-        "relato",
-        "según versiones",
-        "se dice que",
-        "tras la escena",
-        "generó impacto",
-        "desató una ola",
-        "nadie esperaba",
-        "sorprendió a todos"
+        "relato ficticio",
+        "historia ficticia",
+        "recreación",
+        "dramatización"
     ]
 
     fiction_hits = [p for p in fiction_patterns if p in text_lower]
 
     if fiction_hits:
-        risk_score += 0.25
+        risk_score += 0.2
+        context_signals.append("narrativa_ficticia")
 
-    # ======================================================
-    # DETECCIÓN EMOCIONAL
-    # ======================================================
-
-    emotion_words = [
-        "indignación", "furia", "escándalo",
-        "caos", "impacto", "tensión", "controversia"
+    # 🟢 CONTENIDO COMERCIAL (BAJO RIESGO)
+    commercial_patterns = [
+        "oferta",
+        "descuento",
+        "precio",
+        "comprar",
+        "envío",
+        "cuotas",
+        "promo"
     ]
 
-    emotion_hits = [w for w in emotion_words if w in text_lower]
+    commercial_hits = [p for p in commercial_patterns if p in text_lower]
 
-    if len(emotion_hits) >= 2:
-        risk_score += 0.15
-
-    # ======================================================
-    # AJUSTES POR SEÑALES
-    # ======================================================
-
-    signal_count = (
-        len(get_signals(credibility)) +
-        len(get_signals(contradictions)) +
-        len(get_signals(authority)) +
-        len(get_signals(urgency))
-    )
-
-    if signal_count >= 3:
-        risk_score += 0.1
-
-    # combinación peligrosa
-    if urgency_score > 0.4 and credibility_score > 0.3:
-        risk_score += 0.1
+    if commercial_hits:
+        risk_score -= 0.2
+        context_signals.append("contenido_comercial")
 
     # ======================================================
-    # NORMALIZACIÓN
+    # NORMALIZACIÓN FINAL
     # ======================================================
 
     risk_score = max(0.0, min(risk_score, 1.0))
 
     # ======================================================
-    # CONFIDENCE SCORE (PRO)
+    # CLASIFICACIÓN FINAL (UX)
     # ======================================================
 
-    confidence_score = (
-        trust * 0.5 +
-        (1 - authority_score) * 0.2 +
-        (1 - contradiction_score) * 0.2 +
-        (1 - urgency_score) * 0.1
-    )
-
-    confidence_score = max(0.0, min(confidence_score, 1.0))
-
-    # ======================================================
-    # CLASIFICACIÓN UX
-    # ======================================================
-
-    if risk_score < 0.30:
+    if risk_score < 0.3:
         level = "green"
-        message = "Bajo riesgo estructural"
+        message = "Bajo riesgo"
 
-    elif risk_score < 0.60:
+    elif risk_score < 0.6:
         level = "yellow"
         message = "Contenido con señales mixtas"
 
@@ -168,15 +172,16 @@ def analyze_context(text: str, url: str = ""):
     # SEÑALES
     # ======================================================
 
-    signals = list(set(
+    signals = (
         get_signals(credibility) +
         get_signals(contradictions) +
         get_signals(authority) +
         get_signals(urgency) +
-        source_info.get("signals", []) +
-        fiction_hits +
-        emotion_hits
-    ))[:6]
+        context_signals +
+        source_info.get("signals", [])
+    )
+
+    signals = list(set(signals))[:6]
 
     # ======================================================
     # OUTPUT FINAL
@@ -184,7 +189,6 @@ def analyze_context(text: str, url: str = ""):
 
     return {
         "score": round(risk_score, 2),
-        "confidence": round(confidence_score, 2),
         "level": level,
         "message": message,
         "signals": signals,
