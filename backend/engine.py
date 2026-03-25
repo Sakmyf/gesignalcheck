@@ -1,9 +1,9 @@
 # ======================================================
-# SIGNALCHECK ENGINE v12 — FULL INTEGRATED
-# Integra: context_classifier, weight_engine,
-#          context_adjuster, confidence_score,
-#          insight_generator, narrative_profile,
-#          patterns_engine + 11 módulos de análisis
+# SIGNALCHECK ENGINE v12 — PRO READY (v8.7)
+# Integra:
+# - scoring estructural real
+# - confidence score correcto
+# - pipeline completo estable
 # ======================================================
 
 from backend.Analysis.credibility        import analyze          as analyze_credibility
@@ -18,20 +18,19 @@ from backend.Analysis.narrative_patterns import analyze          as analyze_narr
 from backend.Analysis.hypothetical       import check_hypothetical
 from backend.Analysis.promises           import check_promises
 
-from backend.source_analyzer      import analyze_source
-from backend.context_classifier   import classify_context
-from backend.weight_engine        import adjust_weights
-from backend.context_adjuster     import adjust_signals_by_context
-from backend.confidence_score     import compute_confidence
-from backend.insight_generator    import generate_insight
-from backend.narrative_profile    import build_narrative_profile
-from backend.patterns_engine      import detect_patterns
+from backend.source_analyzer             import analyze_source
+from backend.context_classifier         import classify_context
+from backend.Analysis.weight_engine     import adjust_weights
+from backend.context_adjuster           import adjust_signals_by_context
+from backend.confidence_score           import compute_confidence
+from backend.insight_generator          import generate_insight
+from backend.narrative_profile          import build_narrative_profile
+from backend.patterns_engine            import detect_patterns
+from backend.structural_score           import calculate_structural_score
 
 
 # ======================================================
-# PESOS BASE (antes de ajuste dinámico)
-# Suma exacta = 1.00
-# Ningún módulo supera 0.15 para evitar dominancia.
+# PESOS BASE
 # ======================================================
 
 BASE_WEIGHTS = {
@@ -58,6 +57,7 @@ def _score(x) -> float:
         return float(x.get("score", 0.0))
     return float(getattr(x, "points", 0.0))
 
+
 def _signals(x) -> list:
     if isinstance(x, dict):
         return x.get("signals", x.get("reasons", []))
@@ -77,13 +77,14 @@ def analyze_context(text: str, url: str = "") -> dict:
             "message":    "Sin contenido suficiente",
             "signals":    [],
             "confidence": 0.0,
+            "structural_index": 0.0,
             "insight":    "No hay contenido suficiente para analizar.",
             "context":    "general",
             "pro":        {}
         }
 
     # ======================================================
-    # 1. CLASIFICACIÓN DE CONTEXTO
+    # 1. CONTEXTO
     # ======================================================
 
     context = classify_context(text)
@@ -96,13 +97,13 @@ def analyze_context(text: str, url: str = "") -> dict:
     trust       = source_info.get("trust_level", 0.55)
 
     # ======================================================
-    # 3. PESOS DINÁMICOS
+    # 3. PESOS
     # ======================================================
 
     weights = adjust_weights(BASE_WEIGHTS.copy(), context, source_info)
 
     # ======================================================
-    # 4. ANÁLISIS MODULAR (11 módulos)
+    # 4. MÓDULOS
     # ======================================================
 
     credibility        = analyze_credibility(text)
@@ -118,8 +119,7 @@ def analyze_context(text: str, url: str = "") -> dict:
     promises           = check_promises(text)
 
     # ======================================================
-    # 5. SCORES PONDERADOS
-    # authority tiene trust_bonus separado
+    # 5. SCORE BASE
     # ======================================================
 
     authority_risk  = authority.get("score", 0.0)       if isinstance(authority, dict) else 0.0
@@ -127,23 +127,23 @@ def analyze_context(text: str, url: str = "") -> dict:
 
     risk_score = (
         _score(credibility)        * weights["credibility"]        +
-        _score(contradictions)     * weights["contradictions"]      +
-        authority_risk             * weights["authority"]           +
-        _score(urgency)            * weights["urgency"]             +
-        _score(emotions)           * weights["emotions"]            +
-        _score(polarization)       * weights["polarization"]        +
-        _score(misinformation)     * weights["misinformation"]      +
-        _score(scientific_claims)  * weights["scientific_claims"]   +
-        _score(narrative_patterns) * weights["narrative_patterns"]  +
-        _score(hypothetical)       * weights["hypothetical"]        +
+        _score(contradictions)     * weights["contradictions"]     +
+        authority_risk             * weights["authority"]          +
+        _score(urgency)            * weights["urgency"]            +
+        _score(emotions)           * weights["emotions"]           +
+        _score(polarization)       * weights["polarization"]       +
+        _score(misinformation)     * weights["misinformation"]     +
+        _score(scientific_claims)  * weights["scientific_claims"]  +
+        _score(narrative_patterns) * weights["narrative_patterns"] +
+        _score(hypothetical)       * weights["hypothetical"]       +
         _score(promises)           * weights["promises"]
     )
 
-    # Restar trust_bonus de autoridad concreta
+    # Ajuste autoridad
     risk_score -= authority_bonus * weights["authority"]
 
     # ======================================================
-    # 6. AJUSTE POR FUENTE (gradual)
+    # 6. AJUSTE POR FUENTE
     # ======================================================
 
     if trust >= 0.90:
@@ -158,7 +158,7 @@ def analyze_context(text: str, url: str = "") -> dict:
         risk_score *= 1.30
 
     # ======================================================
-    # 7. SEÑALES COMBINADAS + DEDUPLICACIÓN
+    # 7. SEÑALES
     # ======================================================
 
     all_signals = list(dict.fromkeys(
@@ -176,21 +176,16 @@ def analyze_context(text: str, url: str = "") -> dict:
         source_info.get("signals", [])
     ))
 
-    # ======================================================
-    # 8. AJUSTE DE SEÑALES POR CONTEXTO
-    # Reduce falsos positivos según tipo de contenido
-    # ======================================================
-
     adjusted_signals = adjust_signals_by_context(all_signals, context)
 
     # ======================================================
-    # 9. NORMALIZACIÓN
+    # 8. NORMALIZACIÓN
     # ======================================================
 
     risk_score = max(0.0, min(risk_score, 1.0))
 
     # ======================================================
-    # 10. CLASIFICACIÓN
+    # 9. CLASIFICACIÓN
     # ======================================================
 
     if risk_score < 0.25:
@@ -204,16 +199,40 @@ def analyze_context(text: str, url: str = "") -> dict:
         message = "Presión narrativa significativa detectada"
 
     # ======================================================
-    # 11. CAPA PRO (no afecta score — enriquece respuesta)
+    # 🔥 10. MODULE RESULTS (CLAVE NUEVA)
     # ======================================================
 
-    confidence = compute_confidence(adjusted_signals, adjusted_signals)
-    patterns   = detect_patterns(adjusted_signals, risk_score)
-    profile    = build_narrative_profile(adjusted_signals, risk_score)
-    insight    = generate_insight(patterns, profile)
+    module_results = {
+        "credibility":        _score(credibility),
+        "contradictions":     _score(contradictions),
+        "authority":          authority_risk,
+        "urgency":            _score(urgency),
+        "emotions":           _score(emotions),
+        "polarization":       _score(polarization),
+        "misinformation":     _score(misinformation),
+        "scientific_claims":  _score(scientific_claims),
+        "narrative_patterns": _score(narrative_patterns),
+        "hypothetical":       _score(hypothetical),
+        "promises":           _score(promises),
+    }
 
     # ======================================================
-    # 12. OUTPUT FINAL
+    # 🔥 11. SCORES PRO (NUEVO)
+    # ======================================================
+
+    confidence       = compute_confidence(module_results)
+    structural_index = calculate_structural_score(module_results)
+
+    # ======================================================
+    # 12. CAPA PRO
+    # ======================================================
+
+    patterns = detect_patterns(adjusted_signals, risk_score)
+    profile  = build_narrative_profile(adjusted_signals, risk_score)
+    insight  = generate_insight(patterns, profile)
+
+    # ======================================================
+    # 13. OUTPUT FINAL
     # ======================================================
 
     return {
@@ -221,29 +240,15 @@ def analyze_context(text: str, url: str = "") -> dict:
         "level":      level,
         "message":    message,
         "signals":    adjusted_signals[:6],
-        "confidence": round(confidence, 2),
+        "confidence": confidence,
+        "structural_index": structural_index,
         "insight":    insight,
         "context":    context,
         "pro": {
             "patterns":          patterns,
             "narrative_profile": profile,
             "source":            source_info,
-            "context":           context,
             "weights_used":      {k: round(v, 3) for k, v in weights.items()},
-            "_scores": {
-                "credibility":        round(_score(credibility), 3),
-                "contradictions":     round(_score(contradictions), 3),
-                "authority_risk":     round(authority_risk, 3),
-                "authority_bonus":    round(authority_bonus, 3),
-                "urgency":            round(_score(urgency), 3),
-                "emotions":           round(_score(emotions), 3),
-                "polarization":       round(_score(polarization), 3),
-                "misinformation":     round(_score(misinformation), 3),
-                "scientific_claims":  round(_score(scientific_claims), 3),
-                "narrative_patterns": round(_score(narrative_patterns), 3),
-                "hypothetical":       round(_score(hypothetical), 3),
-                "promises":           round(_score(promises), 3),
-                "source_trust":       round(trust, 3),
-            }
+            "_scores": module_results
         }
     }

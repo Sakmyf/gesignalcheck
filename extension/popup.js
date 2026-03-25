@@ -8,16 +8,30 @@ document.addEventListener("DOMContentLoaded", () => {
   const labelBadge = document.getElementById("labelBadge");
   const summaryBox = document.getElementById("summary");
 
+  const scoreEl = document.getElementById("scoreValue");
+  const confEl  = document.getElementById("confidenceValue");
+
+  // =========================
+  // UI STATES
+  // =========================
+
   function startScanUI() {
     scanLine.classList.add("active");
     labelBadge.textContent = "Analizando contenido...";
     labelBadge.className = "signal-label";
     summaryBox.classList.add("hidden");
+
+    if (scoreEl) scoreEl.textContent = "--";
+    if (confEl) confEl.textContent = "--";
   }
 
   function stopScanUI() {
     scanLine.classList.remove("active");
   }
+
+  // =========================
+  // MAIN ANALYSIS
+  // =========================
 
   async function runAnalysis() {
 
@@ -63,7 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
 
           if (res.status === 429) {
-            labelBadge.textContent = "Límite de análisis alcanzado";
+            labelBadge.textContent = "Límite alcanzado";
             stopScanUI();
             return;
           }
@@ -92,17 +106,54 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // =========================
+  // RENDER RESULT (PRO READY)
+  // =========================
+
   function renderResult(data) {
 
     const analysis = data.analysis || data;
-    const level = (analysis.level || "medio").toLowerCase();
 
-    labelBadge.textContent =
-      level === "bajo" ? "Bajo riesgo" :
-      level === "alto" ? "Alto riesgo" :
-      "Requiere atención";
+    const level      = (analysis.level || "yellow").toLowerCase();
+    const score      = analysis.structural_index;
+    const confidence = analysis.confidence;
 
-    labelBadge.className = `signal-label badge-${level === "bajo" ? "low" : "high"}`;
+    // =========================
+    // BADGE
+    // =========================
+
+    if (level === "green") {
+      labelBadge.textContent = "🟢 Bajo riesgo";
+      labelBadge.style.background = "#1e7f4f";
+    }
+    else if (level === "yellow") {
+      labelBadge.textContent = "🟡 Riesgo moderado";
+      labelBadge.style.background = "#b38b00";
+    }
+    else {
+      labelBadge.textContent = "🔴 Alto riesgo";
+      labelBadge.style.background = "#a12d2d";
+    }
+
+    // =========================
+    // SCORE
+    // =========================
+
+    if (scoreEl && score !== undefined) {
+      scoreEl.textContent = Math.round(score);
+    }
+
+    // =========================
+    // CONFIDENCE
+    // =========================
+
+    if (confEl && confidence !== undefined) {
+      confEl.textContent = Math.round(confidence * 100);
+    }
+
+    // =========================
+    // INSIGHT
+    // =========================
 
     summaryBox.textContent =
       analysis.insight ||
@@ -112,10 +163,11 @@ document.addEventListener("DOMContentLoaded", () => {
     summaryBox.classList.remove("hidden");
   }
 
-  // auto-run
-  runAnalysis();
+  // =========================
+  // INIT
+  // =========================
 
-  // botón manual
+  runAnalysis();
   analyzeBtn.addEventListener("click", runAnalysis);
 
 });

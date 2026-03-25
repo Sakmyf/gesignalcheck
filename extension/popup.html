@@ -20,7 +20,41 @@
 
     <!-- RESULTADO -->
     <div id="labelBadge" class="signal-label">Iniciando...</div>
+
+    <!-- 🔥 SCORE -->
+    <div class="score-container">
+
+      <div class="score-main">
+        <span id="scoreValue">--</span>
+        <span class="score-label">/100</span>
+      </div>
+
+      <div class="confidence">
+        Confianza: <span id="confidenceValue">--</span>%
+      </div>
+
+    </div>
+
+    <!-- INSIGHT -->
     <div id="summary" class="hidden insight-box"></div>
+
+    <!-- 🔒 BLOQUE PRO (NUEVO) -->
+    <div class="pro-section locked">
+
+      <div class="pro-title">🔍 Análisis avanzado</div>
+
+      <ul class="pro-list">
+        <li>Emocionalidad: 🔒</li>
+        <li>Manipulación: 🔒</li>
+        <li>Evidencia: 🔒</li>
+        <li>Coherencia: 🔒</li>
+      </ul>
+
+      <button id="upgradeBtn" class="upgrade-btn">
+        Desbloquear análisis completo
+      </button>
+
+    </div>
 
     <!-- BOTÓN -->
     <button id="analyzeBtn">Re-analizar página</button>

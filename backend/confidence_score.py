@@ -1,19 +1,26 @@
 # ======================================================
-# SIGNALCHECK – CONFIDENCE SCORE v1.0
-# Qué tan confiable es el análisis
+# SIGNALCHECK – CONFIDENCE SCORE v2.0 (REAL)
 # ======================================================
 
-def compute_confidence(signals: list, patterns: list):
+def compute_confidence(module_results: dict):
     """
-    Calcula la confianza del análisis
+    Confianza del análisis basada en:
+    - intensidad de señales
+    - consistencia entre módulos
     """
 
-    base = 0.5
+    if not module_results:
+        return 0.0
 
-    # Más señales → más confianza
-    base += min(len(signals) * 0.05, 0.3)
+    values = list(module_results.values())
 
-    # Más patrones → más robusto
-    base += min(len(patterns) * 0.1, 0.2)
+    active_modules = sum(1 for v in values if v > 0.05)
+    avg_intensity  = sum(values) / max(len(values), 1)
 
-    return max(min(base, 1.0), 0.0)
+    consistency = min(active_modules / 6, 1.0)
+
+    confidence = 0.4
+    confidence += avg_intensity * 0.3
+    confidence += consistency * 0.3
+
+    return round(min(confidence, 1.0), 2)

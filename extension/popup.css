@@ -1,120 +1,172 @@
-/* ===============================
-   BASE & CONTAINER
-=============================== */
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
 body {
-  width: 320px;
-  padding: 10px;
-  background: #0f172a;
-  color: #e2e8f0;
-  font-family: sans-serif;
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #0f1115;
+  color: white;
+  width: 300px;
 }
 
 .container {
-  position: relative;
-  padding: 20px;
-  background: #111827;
-  border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  overflow: hidden;
-  min-height: 220px;
+  padding: 12px;
 }
 
-/* ===============================
-   LÁSER ROJO PRO (MEJORADO)
-=============================== */
-.scan-line {
-  display: none; 
-  position: absolute;
-  top: 50%;
-  width: 120px;
-  height: 6px;
-  z-index: 9999;
-  pointer-events: none;
-  border-radius: 50px;
+/* =========================
+   HEADER
+========================= */
 
-  /* núcleo sólido con centro más fuerte */
-  background: linear-gradient(
-    90deg,
-    rgba(255, 0, 0, 0.4) 0%,
-    #ff0000 50%,
-    rgba(255, 0, 0, 0.4) 100%
-  );
-
-  /* glow PRO */
-  box-shadow:
-    0 0 10px #ff0000,
-    0 0 25px rgba(255, 0, 0, 0.8),
-    0 0 40px rgba(255, 0, 0, 0.4);
-}
-
-.scan-line.active {
-  display: block;
-  animation: laserMove 1.4s ease-in-out infinite alternate;
-}
-
-@keyframes laserMove {
-  0% { left: -30%; opacity: 0.4; transform: scaleX(0.9); }
-  50% { opacity: 1; transform: scaleX(1.4); }
-  100% { left: 95%; opacity: 0.4; transform: scaleX(0.9); }
-}
-
-/* ===============================
-   UI
-=============================== */
-.header h1 {
-  font-size: 19px;
-  font-weight: 800;
-  color: #f8fafc;
+.header {
+  text-align: center;
 }
 
 .subtitle {
-  font-size: 11px;
-  color: #64748b;
+  font-size: 12px;
+  color: #aaa;
 }
+
+/* =========================
+   BADGE
+========================= */
 
 .signal-label {
-  display: inline-block;
-  padding: 6px 14px;
-  border-radius: 20px;
+  margin-top: 10px;
+  padding: 6px;
+  border-radius: 6px;
+  text-align: center;
+  font-weight: bold;
+  background: #333;
+  transition: all 0.3s ease;
+}
+
+/* =========================
+   SCORE
+========================= */
+
+.score-container {
+  text-align: center;
+  margin: 14px 0;
+}
+
+.score-main {
+  font-size: 38px;
+  font-weight: bold;
+  margin-top: 6px;
+  transition: all 0.3s ease;
+}
+
+.score-label {
+  font-size: 14px;
+  color: #888;
+}
+
+.confidence {
   font-size: 13px;
-  font-weight: 700;
-  background: #1e293b;
-  color: #94a3b8;
+  margin-top: 4px;
+  color: #bbb;
 }
 
-.badge-low {
-  background: rgba(34,197,94,0.15);
-  color: #4ade80;
-}
-
-.badge-high {
-  background: rgba(239,68,68,0.15);
-  color: #f87171;
-}
+/* =========================
+   INSIGHT
+========================= */
 
 .insight-box {
-  font-size: 14px;
-  color: #cbd5e1;
+  margin-top: 12px;
+  font-size: 13px;
+  color: #ddd;
   text-align: center;
-  line-height: 1.5;
+  line-height: 1.4;
+  padding: 6px;
 }
 
-button#analyzeBtn {
-  width: 100%;
-  padding: 14px;
-  border: none;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  background: #2563eb;
-  color: #fff;
+/* =========================
+   PRO SECTION (🔥 CLAVE)
+========================= */
+
+.pro-section {
+  margin-top: 14px;
+  padding: 10px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #161a22, #1d222c);
+  text-align: center;
+  border: 1px solid #2a2f3a;
 }
+
+.pro-title {
+  font-size: 13px;
+  margin-bottom: 8px;
+  color: #ccc;
+  font-weight: bold;
+}
+
+.pro-list {
+  list-style: none;
+  padding: 0;
+  font-size: 12px;
+  color: #888;
+}
+
+.pro-list li {
+  margin: 5px 0;
+}
+
+/* BOTÓN PRO */
+
+.upgrade-btn {
+  margin-top: 10px;
+  padding: 8px;
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #ff7a18, #ff3d00);
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.upgrade-btn:hover {
+  transform: scale(1.02);
+  opacity: 0.95;
+}
+
+/* =========================
+   BOTÓN NORMAL
+========================= */
+
+button {
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px;
+  background: #2a2f3a;
+  border: none;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+button:hover {
+  background: #3a4050;
+}
+
+/* =========================
+   ANIMACIÓN
+========================= */
+
+.scan-line {
+  height: 2px;
+  background: red;
+  width: 100%;
+  animation: scan 2s infinite;
+}
+
+@keyframes scan {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* =========================
+   UTILIDADES
+========================= */
 
 .hidden {
   display: none;
