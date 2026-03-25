@@ -1,5 +1,5 @@
 // ======================================================
-// SIGNALCHECK CONTENT SCRIPT – PRO STABLE VERSION
+// SIGNALCHECK CONTENT SCRIPT – PRO STABLE VERSION (FIXED)
 // ======================================================
 
 // 🔒 Evitar doble inyección
@@ -44,7 +44,7 @@ if (!window.__SignalCheckInjected__) {
 
       const el = document.querySelector(selector);
 
-      if (el && el.innerText.length > 200) {
+      if (el && el.innerText && el.innerText.length > 200) {
         return el;
       }
 
@@ -130,12 +130,13 @@ if (!window.__SignalCheckInjected__) {
   }
 
   // ------------------------------------------------------
-  // LISTENER EXTENSION
+  // LISTENER EXTENSION (FIX CLAVE)
   // ------------------------------------------------------
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
-    if (!request || request.action !== "extractText") {
+    // 🔥 FIX: aceptar ambos formatos (popup viejo y nuevo)
+    if (!request || (request.action !== "extractText" && request.type !== "GET_PAGE_CONTENT")) {
       return;
     }
 
@@ -144,6 +145,7 @@ if (!window.__SignalCheckInjected__) {
       const cleanText = extractCleanText();
 
       sendResponse({
+        ok: true, // 🔥 IMPORTANTE para popup
         text: cleanText,
         url: window.location.href,
         title: document.title || ""
@@ -154,6 +156,7 @@ if (!window.__SignalCheckInjected__) {
       console.error("❌ Error extrayendo texto:", error);
 
       sendResponse({
+        ok: false,
         text: "",
         url: window.location.href,
         title: document.title || "",
@@ -162,7 +165,7 @@ if (!window.__SignalCheckInjected__) {
 
     }
 
-    return true;
+    return true; // 🔥 CRÍTICO para async en Chrome
 
   });
 
