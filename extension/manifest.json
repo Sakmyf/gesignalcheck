@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
   "name": "SignalCheck",
-  "version": "0.2.1",
-  "description": "Enterprise contextual analysis engine. Detects structural trust and rhetorical manipulation signals.",
-  
+  "version": "0.3.0",
+  "description": "Análisis estructural del contenido — SignalCheck Engine",
+
   "action": {
     "default_popup": "popup.html",
-    "default_title": "SignalCheck — Enterprise Contextual Analysis"
+    "default_title": "SignalCheck"
   },
 
   "background": {
@@ -15,18 +15,19 @@
 
   "permissions": [
     "activeTab",
-    "scripting"
+    "scripting",
+    "tabs"
   ],
 
   "host_permissions": [
+    "<all_urls>",
     "https://gesignalcheck-production-8e78.up.railway.app/*"
   ],
 
   "content_scripts": [
     {
       "matches": [
-        "http://*/*",
-        "https://*/*"
+        "<all_urls>"
       ],
       "js": [
         "content_script.js"
