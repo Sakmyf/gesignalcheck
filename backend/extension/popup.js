@@ -41,6 +41,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
       console.log("📄 TAB ACTIVA:", tab);
 
+      // 🔥 FIX CLAVE → ASEGURAR CONTENT SCRIPT
+      await ensureContentScript(tab.id);
+
+      // pequeña espera para asegurar carga
+      await new Promise(r => setTimeout(r, 200));
+
       const extracted = await getPageText(tab);
 
       console.log("📄 TEXTO EXTRAIDO:", extracted);
@@ -65,6 +71,29 @@ document.addEventListener("DOMContentLoaded", () => {
       setLoading(false);
 
     }
+  }
+
+  // ================================
+  // 🔥 INYECCIÓN SEGURA
+  // ================================
+
+  async function ensureContentScript(tabId) {
+
+    try {
+
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ["content_script.js"]
+      });
+
+      console.log("✅ Content script asegurado");
+
+    } catch (e) {
+
+      console.log("⚠️ Ya estaba inyectado o no necesario:", e);
+
+    }
+
   }
 
   // ================================
@@ -108,7 +137,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ================================
-  // 🔥 FIX QUE FALTABA
+  // VISUAL LEVEL
   // ================================
 
   function setLevelVisual(level) {
@@ -179,7 +208,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
           console.error("❌ runtime.lastError:", chrome.runtime.lastError.message);
 
-          reject(new Error(chrome.runtime.lastError.message));
+          reject(new Error("No se pudo conectar con la página"));
           return;
         }
 
