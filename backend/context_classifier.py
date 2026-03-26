@@ -1,50 +1,21 @@
-# ======================================================
-# SIGNALCHECK – CONTEXT CLASSIFIER v1.0
-# Detecta el tipo de contenido
-# ======================================================
+def classify_context(text: str, url: str = ""):
 
-def classify_context(text: str):
-    """
-    Clasifica el tipo de contenido para ajustar interpretación
-    """
+    t = (text or "").lower()
+    u = (url or "").lower()
 
-    t = text.lower()
+    if any(d in u for d in ["mercadolibre", "amazon", "ebay"]):
+        return "ecommerce"
 
-    # --------------------------------------------------
-    # SALUD / CIENCIA
-    # --------------------------------------------------
-    if any(word in t for word in [
-        "estudio", "científico", "investigación", "ensayo",
-        "salud", "medicina", "tratamiento", "enfermedad"
-    ]):
-        return "health_science"
+    if any(d in u for d in ["facebook", "instagram", "tiktok", "twitter", "x.com"]):
+        return "social"
 
-    # --------------------------------------------------
-    # POLÍTICA
-    # --------------------------------------------------
-    if any(word in t for word in [
-        "gobierno", "presidente", "elecciones",
-        "congreso", "política", "ley"
-    ]):
-        return "politics"
+    if any(d in u for d in ["chequeado", "maldita", "snopes"]):
+        return "fact_check"
 
-    # --------------------------------------------------
-    # OPINIÓN / EDITORIAL
-    # --------------------------------------------------
-    if any(word in t for word in [
-        "opinión", "creo", "pienso", "desde mi punto de vista"
-    ]):
-        return "opinion"
+    if any(d in u for d in [".gob", ".gov", ".edu"]):
+        return "institutional"
 
-    # --------------------------------------------------
-    # NOTICIA GENERAL
-    # --------------------------------------------------
-    if any(word in t for word in [
-        "informó", "según", "reportó", "declaró"
-    ]):
-        return "news"
+    if any(word in t for word in ["informó", "reportó", "según"]):
+        return "news_media"
 
-    # --------------------------------------------------
-    # DEFAULT
-    # --------------------------------------------------
     return "general"
