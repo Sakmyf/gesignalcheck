@@ -1,13 +1,18 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
-  margin: 0;
-  font-family: Arial, sans-serif;
+  width: 300px;
   background: #0f1115;
   color: white;
-  width: 300px;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 .container {
-  padding: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 /* =========================
@@ -18,9 +23,45 @@ body {
   text-align: center;
 }
 
+.header h1 {
+  font-size: 17px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
 .subtitle {
-  font-size: 12px;
-  color: #aaa;
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+/* =========================
+   SCAN LINE
+========================= */
+
+.scan-line {
+  height: 2px;
+  width: 100%;
+  background: transparent;
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+
+.scan-line.active::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, #ef4444, transparent);
+  animation: scanMove 1.4s ease-in-out infinite;
+}
+
+@keyframes scanMove {
+  0%   { left: -40%; }
+  100% { left: 100%; }
 }
 
 /* =========================
@@ -28,13 +69,14 @@ body {
 ========================= */
 
 .signal-label {
-  margin-top: 10px;
-  padding: 6px;
-  border-radius: 6px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
   text-align: center;
-  font-weight: bold;
-  background: #333;
-  transition: all 0.3s ease;
+  background: #1e293b;
+  color: #94a3b8;
+  transition: background 0.3s, color 0.3s;
 }
 
 /* =========================
@@ -43,72 +85,70 @@ body {
 
 .score-container {
   text-align: center;
-  margin: 14px 0;
+  padding: 4px 0;
 }
 
 .score-main {
-  font-size: 38px;
-  font-weight: bold;
-  margin-top: 6px;
-  transition: all 0.3s ease;
+  font-size: 36px;
+  font-weight: 800;
+  color: #f1f5f9;
+  line-height: 1;
 }
 
 .score-label {
   font-size: 14px;
-  color: #888;
+  color: #475569;
+  font-weight: 400;
 }
 
 .confidence {
-  font-size: 13px;
+  font-size: 12px;
+  color: #64748b;
   margin-top: 4px;
-  color: #bbb;
 }
 
 /* =========================
-   INSIGHT
+   INSIGHT / SUMMARY
 ========================= */
 
 .insight-box {
-  margin-top: 12px;
-  font-size: 13px;
-  color: #ddd;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #cbd5e1;
   text-align: center;
-  line-height: 1.4;
-  padding: 6px;
+  padding: 6px 8px;
+  background: #161b27;
+  border-radius: 6px;
 }
 
 /* =========================
-   PRO SECTION (🔥 CLAVE)
+   PRO SECTION
 ========================= */
 
 .pro-section {
-  margin-top: 14px;
   padding: 10px;
   border-radius: 10px;
   background: linear-gradient(145deg, #161a22, #1d222c);
-  text-align: center;
   border: 1px solid #2a2f3a;
+  text-align: center;
 }
 
 .pro-title {
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
   margin-bottom: 8px;
-  color: #ccc;
-  font-weight: bold;
 }
 
 .pro-list {
   list-style: none;
   padding: 0;
   font-size: 12px;
-  color: #888;
+  color: #475569;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
-
-.pro-list li {
-  margin: 5px 0;
-}
-
-/* BOTÓN PRO */
 
 .upgrade-btn {
   margin-top: 10px;
@@ -118,56 +158,41 @@ body {
   border-radius: 8px;
   background: linear-gradient(90deg, #ff7a18, #ff3d00);
   color: white;
-  font-weight: bold;
+  font-size: 12px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: opacity 0.2s, transform 0.15s;
 }
 
 .upgrade-btn:hover {
-  transform: scale(1.02);
-  opacity: 0.95;
+  opacity: 0.9;
+  transform: translateY(-1px);
 }
 
 /* =========================
-   BOTÓN NORMAL
+   BOTÓN REANALIZAR
 ========================= */
 
-button {
+button#analyzeBtn {
   width: 100%;
-  margin-top: 12px;
-  padding: 8px;
-  background: #2a2f3a;
+  padding: 9px;
   border: none;
-  color: white;
-  border-radius: 6px;
+  border-radius: 8px;
+  background: #1e293b;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s;
 }
 
-button:hover {
-  background: #3a4050;
-}
-
-/* =========================
-   ANIMACIÓN
-========================= */
-
-.scan-line {
-  height: 2px;
-  background: red;
-  width: 100%;
-  animation: scan 2s infinite;
-}
-
-@keyframes scan {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+button#analyzeBtn:hover {
+  background: #2d3748;
+  color: #e2e8f0;
 }
 
 /* =========================
    UTILIDADES
 ========================= */
 
-.hidden {
-  display: none;
-}
+.hidden { display: none; }
