@@ -1,5 +1,8 @@
 const API_URL = "https://gesignalcheck-production-8e78.up.railway.app/v3/verify";
 
+// 🔥 FIX CRÍTICO: definir EXT_ID
+const EXT_ID = "dpgnanocamaeieplhgnapgcannjcpghn";
+
 document.addEventListener("DOMContentLoaded", () => {
 
   const analyzeBtn = document.getElementById("analyzeBtn");
@@ -9,10 +12,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const scoreEl = document.getElementById("scoreValue");
   const confEl  = document.getElementById("confidenceValue");
-
-  // =========================
-  // UI STATES
-  // =========================
 
   function startScanUI() {
     scanLine.classList.add("active");
@@ -27,10 +26,6 @@ document.addEventListener("DOMContentLoaded", () => {
   function stopScanUI() {
     scanLine.classList.remove("active");
   }
-
-  // =========================
-  // MAIN ANALYSIS
-  // =========================
 
   async function runAnalysis() {
 
@@ -49,8 +44,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       chrome.tabs.sendMessage(tab.id, { action: "extractText" }, async (extracted) => {
 
-        if (chrome.runtime.lastError || !extracted) {
-          labelBadge.textContent = "Error: recargar página";
+        if (chrome.runtime.lastError || !extracted || !extracted.ok) {
+          console.error("❌ Error content script:", chrome.runtime.lastError);
+          labelBadge.textContent = "Error leyendo página";
           stopScanUI();
           return;
         }
@@ -68,6 +64,8 @@ document.addEventListener("DOMContentLoaded", () => {
               url: extracted.url
             })
           });
+
+          console.log("📡 Response status:", res.status);
 
           if (res.status === 401) {
             labelBadge.textContent = "Extensión no autorizada";
@@ -93,6 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }, wait);
 
         } catch (e) {
+          console.error("❌ Error fetch:", e);
           labelBadge.textContent = "Error de conexión";
           stopScanUI();
         }
@@ -100,26 +99,19 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
     } catch (err) {
+      console.error("❌ Error general:", err);
       labelBadge.textContent = "Error de pestaña";
       stopScanUI();
     }
   }
-
-  // =========================
-  // RENDER RESULT (FIX FINAL)
-  // =========================
 
   function renderResult(data) {
 
     const analysis = data.analysis || data;
 
     const level      = (analysis.level || "yellow").toLowerCase();
-    const score      = analysis.score;        // ✅ FIX CLAVE
-    const confidence = analysis.confidence;   // ✅ FIX CLAVE
-
-    // =========================
-    // BADGE
-    // =========================
+    const score      = analysis.score;
+    const confidence = analysis.confidence;
 
     if (level === "green") {
       labelBadge.textContent = "🟢 Bajo riesgo";
@@ -134,25 +126,13 @@ document.addEventListener("DOMContentLoaded", () => {
       labelBadge.style.background = "#a12d2d";
     }
 
-    // =========================
-    // SCORE
-    // =========================
-
     if (scoreEl && score !== undefined) {
       scoreEl.textContent = Math.round(score);
     }
 
-    // =========================
-    // CONFIDENCE
-    // =========================
-
     if (confEl && confidence !== undefined) {
-      confEl.textContent = Math.round(confidence); // ✅ NO multiplicar
+      confEl.textContent = Math.round(confidence);
     }
-
-    // =========================
-    // INSIGHT
-    // =========================
 
     summaryBox.textContent =
       analysis.insight ||
@@ -161,10 +141,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     summaryBox.classList.remove("hidden");
   }
-
-  // =========================
-  // INIT
-  // =========================
 
   runAnalysis();
   analyzeBtn.addEventListener("click", runAnalysis);
