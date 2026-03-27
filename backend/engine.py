@@ -304,7 +304,21 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
     # PRO
     # ======================================================
 
-    confidence = compute_confidence(adjusted_signals)
+ _scores_dict = {
+    "credibility":        _score(credibility),
+    "contradictions":     _score(contradictions),
+    "authority":          authority_risk,
+    "urgency":            _score(urgency),
+    "emotions":           _score(emotions),
+    "polarization":       _score(polarization),
+    "misinformation":     _score(misinformation),
+    "scientific_claims":  _score(scientific_claims),
+    "narrative_patterns": _score(narrative_patterns),
+    "hypothetical":       _score(hypothetical),
+    "promises":           _score(promises),
+    "uncertainty":        _score(uncertainty),
+}
+confidence = compute_confidence(_scores_dict)
     patterns   = detect_patterns(adjusted_signals, risk_score)
     profile    = build_narrative_profile(adjusted_signals, risk_score)
     insight    = generate_insight(patterns, profile)
