@@ -1,5 +1,5 @@
 # ======================================================
-# SIGNALCHECK ENGINE v13.1 — CONTEXT + HEADLINE INTELLIGENCE
+# SIGNALCHECK ENGINE v13.2 — CALIBRADO REAL
 # ======================================================
 
 from backend.Analysis.credibility        import analyze          as analyze_credibility
@@ -15,7 +15,6 @@ from backend.Analysis.hypothetical       import check_hypothetical
 from backend.Analysis.promises           import check_promises
 from backend.Analysis.detect_uncertainty import detect_uncertainty
 
-# 🆕 NUEVO MÓDULO
 from backend.Analysis.commercial_risk import analyze_commercial_risk
 
 from backend.source_analyzer    import analyze_source
@@ -44,51 +43,86 @@ BASE_WEIGHTS = {
 }
 
 
+# ======================================================
+# DETECCIÓN CONTEXTO
+# ======================================================
+
 def _detect_content_type(text: str, url: str) -> str:
     t = text.lower()
     u = url.lower()
+
     if any(w in t for w in ["comprar", "oferta", "envío", "carrito"]):
         return "ecommerce"
+
     if ".gov" in u or ".edu" in u or ".gob" in u:
         return "institutional"
+
     if any(w in t for w in ["según", "informó", "reportó", "fuentes"]):
         return "news"
+
     return "generic"
 
 
 def _apply_signal_prioritization(content_type: str, scores: dict) -> dict:
     if content_type == "ecommerce":
         scores["urgency"] *= 0.4
+
     if content_type == "news":
         scores["uncertainty"] *= 0.8
+
     if content_type == "institutional":
         scores["emotions"] *= 0.6
+
     return scores
 
 
+# ======================================================
+# 🔥 BOOSTS (MEJORADOS)
+# ======================================================
+
 def _combo_boost(scores: dict) -> float:
     bonus = 0.0
-    if scores["urgency"] > 0.5 and scores["emotions"] > 0.5:
-        bonus += 0.10
-    if scores["promises"] > 0.5 and scores["credibility"] > 0.5:
-        bonus += 0.15
+
+    if scores["urgency"] > 0.4 and scores["emotions"] > 0.4:
+        bonus += 0.25
+
+    if scores["narrative_patterns"] > 0.5:
+        bonus += 0.20
+
+    if scores["polarization"] > 0.5:
+        bonus += 0.20
+
+    if scores["misinformation"] > 0.4:
+        bonus += 0.30
+
     return bonus
 
 
 def _headline_boost(title: str) -> float:
     if not title:
         return 0.0
+
     t = title.lower()
     boost = 0.0
+
     if any(w in t for w in [
         "brutal", "impactante", "terrible", "explosión",
         "horror", "dramático", "escándalo", "urgente"
     ]):
-        boost += 0.20
+        boost += 0.40
+
     if "!" in title or title.count('"') >= 2:
-        boost += 0.10
+        boost += 0.20
+
+    if title.isupper():
+        boost += 0.20
+
     return boost
 
+
+# ======================================================
+# HELPERS
+# ======================================================
 
 def _score(x) -> float:
     if isinstance(x, dict):
@@ -102,34 +136,30 @@ def _signals(x) -> list:
     return list(getattr(x, "reasons", []))
 
 
+# ======================================================
+# MAIN
+# ======================================================
+
 def analyze_context(text: str, url: str = "", title: str = "") -> dict:
 
     if not text or len(text.strip()) < 30:
         return {
-            "score":      0.0,
-            "level":      "green",
-            "message":    "Sin contenido suficiente",
-            "signals":    [],
+            "score": 0.0,
+            "level": "green",
+            "message": "Sin contenido suficiente",
+            "signals": [],
             "confidence": 0.0,
-            "insight":    "",
-            "context":    "general",
-            "pro":        {},
+            "insight": "",
+            "context": "general",
+            "pro": {},
             "commercial_risk": {}
         }
-
-    # ======================================================
-    # CONTEXTO + FUENTE
-    # ======================================================
 
     context      = classify_context(text)
     source_info  = analyze_source(url, text)
     trust        = source_info.get("trust_level", 0.55)
     weights      = adjust_weights(BASE_WEIGHTS.copy(), context, source_info)
     content_type = _detect_content_type(text, url)
-
-    # ======================================================
-    # MÓDULOS (12)
-    # ======================================================
 
     credibility        = analyze_credibility(text)
     contradictions     = analyze_contradictions(text)
@@ -147,23 +177,10 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
     authority_risk  = authority.get("score", 0.0)       if isinstance(authority, dict) else 0.0
     authority_bonus = authority.get("trust_bonus", 0.0) if isinstance(authority, dict) else 0.0
 
-    # ======================================================
-    # 🆕 COMMERCIAL RISK (solo ecommerce)
-    # ======================================================
-
     if content_type == "ecommerce":
         commercial_risk = analyze_commercial_risk(text, url)
     else:
-        commercial_risk = {
-            "level": "none",
-            "score": 0,
-            "summary": "",
-            "signals": []
-        }
-
-    # ======================================================
-    # SCORES
-    # ======================================================
+        commercial_risk = {"level": "none", "score": 0, "summary": "", "signals": []}
 
     scores = {
         "credibility":        _score(credibility),
@@ -187,12 +204,14 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
     # ======================================================
 
     risk_score = sum(scores[k] * weights.get(k, 0.0) for k in scores)
+
     risk_score += _combo_boost(scores)
 
     headline_source = title if title and len(title.strip()) >= 10 else text[:200]
     risk_score += _headline_boost(headline_source)
 
-    risk_score -= authority_bonus * weights.get("authority", 0.10)
+    # 🔧 FIX CLAVE
+    risk_score -= authority_bonus * 0.05
 
     # ======================================================
     # AJUSTE POR FUENTE
@@ -210,7 +229,7 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
         risk_score *= 1.15
 
     # ======================================================
-    # SEÑALES POSITIVAS
+    # POSITIVOS
     # ======================================================
 
     positive = 0.0
@@ -225,7 +244,7 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
     risk_score = max(0.0, min(risk_score, 1.0))
 
     # ======================================================
-    # CLASIFICACIÓN
+    # LEVEL
     # ======================================================
 
     if risk_score < 0.20:
@@ -239,7 +258,7 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
         message = "Presión narrativa significativa detectada"
 
     # ======================================================
-    # SEÑALES
+    # SIGNALS
     # ======================================================
 
     all_signals = list(dict.fromkeys(
@@ -260,18 +279,10 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
 
     adjusted_signals = adjust_signals_by_context(all_signals, context)
 
-    # ======================================================
-    # CAPA PRO
-    # ======================================================
-
     confidence = compute_confidence(scores)
     patterns   = detect_patterns(adjusted_signals, risk_score)
     profile    = build_narrative_profile(adjusted_signals, risk_score)
     insight    = generate_insight(patterns, profile)
-
-    # ======================================================
-    # OUTPUT FINAL
-    # ======================================================
 
     return {
         "score":       round(risk_score, 2),
@@ -282,7 +293,7 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
         "insight":     insight,
         "context":     context,
         "source_type": source_info.get("type", "unknown"),
-        "commercial_risk": commercial_risk,  # 🔥 NUEVO
+        "commercial_risk": commercial_risk,
         "pro": {
             "patterns":          patterns,
             "narrative_profile": profile,
