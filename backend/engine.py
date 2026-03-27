@@ -217,12 +217,12 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
 
     # 🔥 HEADLINE BOOST (CLAVE)
     # fallback si no hay title
-headline_source = title
+    headline_source = title
 
-if not headline_source or len(headline_source.strip()) < 10:
+    if not headline_source or len(headline_source.strip()) < 10:
     headline_source = text[:200]  # primeros caracteres del contenido
 
-risk_score += _headline_boost(headline_source)
+    risk_score += _headline_boost(headline_source)
 
     risk_score -= authority_bonus * weights["authority"]
 
