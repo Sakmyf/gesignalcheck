@@ -1,21 +1,47 @@
 # ======================================================
-# SIGNALCHECK – COMMERCIAL RISK MODULE
-# Detecta señales de posible fraude en sitios comerciales
+# SIGNALCHECK – COMMERCIAL RISK v2
+# Detección de riesgo comercial / fraude contextual
 # ======================================================
 
 import re
 from urllib.parse import urlparse
 
 # ------------------------------------------------------
-# CONFIGURACIÓN BASE
+# CONFIG
 # ------------------------------------------------------
 
-SUSPICIOUS_KEYWORDS = [
-    "oferta exclusiva",
-    "solo hoy",
-    "descuento limitado",
-    "últimas unidades",
-    "compra ahora",
+KNOWN_DOMAINS = [
+    "mercadolibre",
+    "amazon",
+    "ebay",
+    "fravega",
+    "garbarino",
+    "carrefour",
+    "coto",
+    "vecompras",
+    "tececompras",
+]
+
+HIGH_VALUE_PRODUCTS = [
+    "iphone",
+    "samsung",
+    "macbook",
+    "notebook",
+    "playstation",
+]
+
+LOGIN_PATTERNS = [
+    "iniciar sesión",
+    "registrate",
+    "crear cuenta",
+    "acceder",
+    "ver precios",
+]
+
+PRICE_HIDDEN_PATTERNS = [
+    "ver precio",
+    "consultar precio",
+    "precio no disponible",
 ]
 
 GENERIC_REVIEWS_PATTERNS = [
@@ -24,25 +50,16 @@ GENERIC_REVIEWS_PATTERNS = [
     r"\d{1,3},\d{3}",
 ]
 
-KNOWN_DOMAINS = [
-    "mercadolibre",
-    "amazon",
-    "ebay",
-    "fravega",
-    "garbarino",
-    "compraahora",
-    "carrefour",
-]
-
-HIGH_VALUE_PRODUCTS = [
-    "iphone",
-    "samsung",
-    "macbook",
-    "notebook",
+LEGAL_PATTERNS = [
+    "cuit",
+    "razón social",
+    "direccion",
+    "términos",
+    "condiciones",
 ]
 
 # ------------------------------------------------------
-# UTILIDAD
+# UTIL
 # ------------------------------------------------------
 
 def extract_domain(url: str) -> str:
@@ -51,36 +68,72 @@ def extract_domain(url: str) -> str:
     except:
         return ""
 
+
+def is_ecommerce_context(text: str) -> bool:
+    t = text.lower()
+    return any(w in t for w in ["comprar", "carrito", "oferta", "envío"])
+
+
 # ------------------------------------------------------
-# DETECTOR PRINCIPAL
+# MAIN
 # ------------------------------------------------------
 
 def analyze_commercial_risk(text: str, url: str = "") -> dict:
 
-    risk_score = 0
-    signals = []
-
     text_lower = text.lower()
     domain = extract_domain(url)
 
-    # --------------------------------------------------
-    # 1. Dominio sospechoso
-    # --------------------------------------------------
-    if domain:
-        if not any(k in domain for k in KNOWN_DOMAINS):
-            risk_score += 3
-            signals.append("Dominio no reconocido o poco habitual")
+    risk_score = 0
+    signals = []
 
     # --------------------------------------------------
-    # 2. Producto de alto valor + contexto comercial
+    # 1. CONTEXTO
     # --------------------------------------------------
+
+    if not is_ecommerce_context(text):
+        return {
+            "level": "none",
+            "score": 0,
+            "summary": "",
+            "signals": []
+        }
+
+    # --------------------------------------------------
+    # 2. DOMINIO DESCONOCIDO
+    # --------------------------------------------------
+
+    if domain and not any(k in domain for k in KNOWN_DOMAINS):
+        risk_score += 4
+        signals.append("Dominio no reconocido o de baja reputación")
+
+    # --------------------------------------------------
+    # 3. LOGIN / BLOQUEO
+    # --------------------------------------------------
+
+    if any(p in text_lower for p in LOGIN_PATTERNS):
+        risk_score += 3
+        signals.append("Acceso restringido o login obligatorio")
+
+    # --------------------------------------------------
+    # 4. PRECIO OCULTO
+    # --------------------------------------------------
+
+    if any(p in text_lower for p in PRICE_HIDDEN_PATTERNS):
+        risk_score += 2
+        signals.append("Información de precios no visible")
+
+    # --------------------------------------------------
+    # 5. PRODUCTO ALTO VALOR
+    # --------------------------------------------------
+
     if any(p in text_lower for p in HIGH_VALUE_PRODUCTS):
         risk_score += 2
         signals.append("Producto de alto valor detectado")
 
     # --------------------------------------------------
-    # 3. Patrones de reviews genéricas
+    # 6. REVIEWS SOSPECHOSAS
     # --------------------------------------------------
+
     for pattern in GENERIC_REVIEWS_PATTERNS:
         if re.search(pattern, text_lower):
             risk_score += 3
@@ -88,25 +141,29 @@ def analyze_commercial_risk(text: str, url: str = "") -> dict:
             break
 
     # --------------------------------------------------
-    # 4. Palabras comerciales agresivas
+    # 7. FALTA INFO LEGAL
     # --------------------------------------------------
-    for keyword in SUSPICIOUS_KEYWORDS:
-        if keyword in text_lower:
-            risk_score += 2
-            signals.append("Lenguaje comercial agresivo detectado")
-            break
 
-    # --------------------------------------------------
-    # 5. Falta de información legal básica
-    # --------------------------------------------------
-    if not any(k in text_lower for k in ["cuit", "razón social", "direccion", "términos"]):
+    if not any(k in text_lower for k in LEGAL_PATTERNS):
         risk_score += 2
         signals.append("Ausencia de información legal identificable")
 
     # --------------------------------------------------
-    # NIVEL FINAL
+    # 8. NORMALIZACIÓN (ANTI FALSO POSITIVO)
     # --------------------------------------------------
-    if risk_score >= 8:
+
+    # Si el dominio es conocido, reducimos riesgo
+    if domain and any(k in domain for k in KNOWN_DOMAINS):
+        risk_score *= 0.5
+
+    # Limitar score
+    risk_score = min(risk_score, 10)
+
+    # --------------------------------------------------
+    # LEVEL
+    # --------------------------------------------------
+
+    if risk_score >= 7:
         level = "alto"
     elif risk_score >= 4:
         level = "medio"
@@ -114,24 +171,23 @@ def analyze_commercial_risk(text: str, url: str = "") -> dict:
         level = "bajo"
 
     # --------------------------------------------------
+    # SUMMARY
+    # --------------------------------------------------
+
+    if level == "alto":
+        summary = "El sitio presenta múltiples señales de riesgo comercial."
+    elif level == "medio":
+        summary = "Se detectan indicadores que sugieren cautela en la compra."
+    else:
+        summary = "No se detectan señales relevantes de riesgo comercial."
+
+    # --------------------------------------------------
     # OUTPUT
     # --------------------------------------------------
+
     return {
         "level": level,
-        "score": risk_score,
-        "summary": build_summary(level),
-        "signals": signals
+        "score": round(risk_score, 1),
+        "summary": summary,
+        "signals": signals[:4]
     }
-
-
-# ------------------------------------------------------
-# RESUMEN AUTOMÁTICO
-# ------------------------------------------------------
-
-def build_summary(level: str) -> str:
-    if level == "alto":
-        return "El sitio presenta múltiples señales de posible riesgo comercial."
-    elif level == "medio":
-        return "Se detectaron algunos indicadores que podrían sugerir riesgo comercial."
-    else:
-        return "No se detectan señales relevantes de riesgo comercial."
