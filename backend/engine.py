@@ -304,7 +304,7 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
     # PRO
     # ======================================================
 
-    confidence = compute_confidence(adjusted_signals, adjusted_signals)
+    confidence = compute_confidence(adjusted_signals)
     patterns   = detect_patterns(adjusted_signals, risk_score)
     profile    = build_narrative_profile(adjusted_signals, risk_score)
     insight    = generate_insight(patterns, profile)
