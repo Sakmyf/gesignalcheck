@@ -15,6 +15,9 @@ from backend.Analysis.hypothetical       import check_hypothetical
 from backend.Analysis.promises           import check_promises
 from backend.Analysis.detect_uncertainty import detect_uncertainty
 
+# 🆕 NUEVO MÓDULO
+from backend.Analysis.commercial_risk import analyze_commercial_risk
+
 from backend.source_analyzer    import analyze_source
 from backend.context_classifier import classify_context
 from backend.weight_engine      import adjust_weights
@@ -110,7 +113,8 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
             "confidence": 0.0,
             "insight":    "",
             "context":    "general",
-            "pro":        {}
+            "pro":        {},
+            "commercial_risk": {}
         }
 
     # ======================================================
@@ -142,6 +146,20 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
 
     authority_risk  = authority.get("score", 0.0)       if isinstance(authority, dict) else 0.0
     authority_bonus = authority.get("trust_bonus", 0.0) if isinstance(authority, dict) else 0.0
+
+    # ======================================================
+    # 🆕 COMMERCIAL RISK (solo ecommerce)
+    # ======================================================
+
+    if content_type == "ecommerce":
+        commercial_risk = analyze_commercial_risk(text, url)
+    else:
+        commercial_risk = {
+            "level": "none",
+            "score": 0,
+            "summary": "",
+            "signals": []
+        }
 
     # ======================================================
     # SCORES
@@ -192,7 +210,7 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
         risk_score *= 1.15
 
     # ======================================================
-    # SEÑALES POSITIVAS (reducen levemente)
+    # SEÑALES POSITIVAS
     # ======================================================
 
     positive = 0.0
@@ -252,7 +270,7 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
     insight    = generate_insight(patterns, profile)
 
     # ======================================================
-    # OUTPUT
+    # OUTPUT FINAL
     # ======================================================
 
     return {
@@ -264,6 +282,7 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
         "insight":     insight,
         "context":     context,
         "source_type": source_info.get("type", "unknown"),
+        "commercial_risk": commercial_risk,  # 🔥 NUEVO
         "pro": {
             "patterns":          patterns,
             "narrative_profile": profile,
