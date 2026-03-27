@@ -1,5 +1,5 @@
 # ======================================================
-# SIGNALCHECK ENGINE v13.2 — CALIBRADO REAL
+# SIGNALCHECK ENGINE v13.3 — CALIBRADO REAL + SCAM LAYER
 # ======================================================
 
 from backend.Analysis.credibility        import analyze          as analyze_credibility
@@ -15,6 +15,7 @@ from backend.Analysis.hypothetical       import check_hypothetical
 from backend.Analysis.promises           import check_promises
 from backend.Analysis.detect_uncertainty import detect_uncertainty
 
+# 🔥 NUEVO: capa comercial/engaño
 from backend.Analysis.commercial_risk import analyze_commercial_risk
 
 from backend.source_analyzer    import analyze_source
@@ -51,7 +52,7 @@ def _detect_content_type(text: str, url: str) -> str:
     t = text.lower()
     u = url.lower()
 
-    if any(w in t for w in ["comprar", "oferta", "envío", "carrito"]):
+    if any(w in t for w in ["comprar", "oferta", "envío", "carrito", "shop", "buy"]):
         return "ecommerce"
 
     if ".gov" in u or ".edu" in u or ".gob" in u:
@@ -77,7 +78,7 @@ def _apply_signal_prioritization(content_type: str, scores: dict) -> dict:
 
 
 # ======================================================
-# 🔥 BOOSTS (MEJORADOS)
+# 🔥 BOOSTS
 # ======================================================
 
 def _combo_boost(scores: dict) -> float:
@@ -161,6 +162,10 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
     weights      = adjust_weights(BASE_WEIGHTS.copy(), context, source_info)
     content_type = _detect_content_type(text, url)
 
+    # =========================
+    # CORE SIGNALS
+    # =========================
+
     credibility        = analyze_credibility(text)
     contradictions     = analyze_contradictions(text)
     authority          = analyze_authority(text)
@@ -174,8 +179,12 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
     promises           = check_promises(text)
     uncertainty        = detect_uncertainty(text, title)
 
-    authority_risk  = authority.get("score", 0.0)       if isinstance(authority, dict) else 0.0
+    authority_risk  = authority.get("score", 0.0) if isinstance(authority, dict) else 0.0
     authority_bonus = authority.get("trust_bonus", 0.0) if isinstance(authority, dict) else 0.0
+
+    # =========================
+    # 🔥 NUEVO: COMERCIAL / SCAM
+    # =========================
 
     if content_type == "ecommerce":
         commercial_risk = analyze_commercial_risk(text, url)
@@ -210,8 +219,12 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
     headline_source = title if title and len(title.strip()) >= 10 else text[:200]
     risk_score += _headline_boost(headline_source)
 
-    # 🔧 FIX CLAVE
+    # 🔥 ajuste autoridad
     risk_score -= authority_bonus * 0.05
+
+    # 🔥 INTEGRACIÓN SCAM (suave, no rompe nada)
+    if commercial_risk.get("score", 0) > 0:
+        risk_score += min(0.25, commercial_risk["score"] * 0.5)
 
     # ======================================================
     # AJUSTE POR FUENTE
@@ -229,18 +242,9 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
         risk_score *= 1.15
 
     # ======================================================
-    # POSITIVOS
+    # NORMALIZACIÓN
     # ======================================================
 
-    positive = 0.0
-    if scores["emotions"] < 0.2:
-        positive += 0.03
-    if scores["urgency"] == 0:
-        positive += 0.03
-    if scores["contradictions"] == 0:
-        positive += 0.04
-
-    risk_score = max(0.0, risk_score - positive)
     risk_score = max(0.0, min(risk_score, 1.0))
 
     # ======================================================
@@ -274,7 +278,8 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
         _signals(hypothetical)       +
         _signals(promises)           +
         _signals(uncertainty)        +
-        source_info.get("signals", [])
+        source_info.get("signals", []) +
+        commercial_risk.get("signals", [])   # 🔥 agregado
     ))
 
     adjusted_signals = adjust_signals_by_context(all_signals, context)
