@@ -15,7 +15,7 @@ from backend.Analysis.hypothetical       import check_hypothetical
 from backend.Analysis.promises           import check_promises
 from backend.Analysis.detect_uncertainty import detect_uncertainty
 
-from backend.source_analyzer     import analyze_source
+from backend.source_analyzer    import analyze_source
 from backend.context_classifier import classify_context
 from backend.weight_engine      import adjust_weights
 from backend.context_adjuster   import adjust_signals_by_context
@@ -41,128 +41,90 @@ BASE_WEIGHTS = {
 }
 
 
-# ======================================================
-# PRIORITIZATION LAYER
-# ======================================================
-
 def _detect_content_type(text: str, url: str) -> str:
-
-    text = text.lower()
-    url = url.lower()
-
-    if any(w in text for w in ["comprar", "oferta", "envío", "carrito"]):
+    t = text.lower()
+    u = url.lower()
+    if any(w in t for w in ["comprar", "oferta", "envío", "carrito"]):
         return "ecommerce"
-
-    if ".gov" in url or ".edu" in url:
+    if ".gov" in u or ".edu" in u or ".gob" in u:
         return "institutional"
-
-    if any(w in text for w in ["según", "informó", "reportó", "fuentes"]):
+    if any(w in t for w in ["según", "informó", "reportó", "fuentes"]):
         return "news"
-
     return "generic"
 
 
-def _apply_signal_prioritization(context_type, scores_dict):
-
-    if context_type == "ecommerce":
-        scores_dict["urgency"] *= 0.4
-
-    if context_type == "news":
-        scores_dict["uncertainty"] *= 0.8   # 🔥 ajustado
-
-    if context_type == "institutional":
-        scores_dict["emotions"] *= 0.6
-
-    return scores_dict
+def _apply_signal_prioritization(content_type: str, scores: dict) -> dict:
+    if content_type == "ecommerce":
+        scores["urgency"] *= 0.4
+    if content_type == "news":
+        scores["uncertainty"] *= 0.8
+    if content_type == "institutional":
+        scores["emotions"] *= 0.6
+    return scores
 
 
-def _combo_boost(scores_dict):
-
+def _combo_boost(scores: dict) -> float:
     bonus = 0.0
-
-    if scores_dict["urgency"] > 0.5 and scores_dict["emotions"] > 0.5:
+    if scores["urgency"] > 0.5 and scores["emotions"] > 0.5:
         bonus += 0.10
-
-    if scores_dict["promises"] > 0.5 and scores_dict["credibility"] > 0.5:
+    if scores["promises"] > 0.5 and scores["credibility"] > 0.5:
         bonus += 0.15
-
     return bonus
 
 
-def _headline_boost(title: str):
-
+def _headline_boost(title: str) -> float:
     if not title:
         return 0.0
-
-    title = title.lower()
-
+    t = title.lower()
     boost = 0.0
-
-    # palabras sensacionalistas
-    if any(word in title for word in [
+    if any(w in t for w in [
         "brutal", "impactante", "terrible", "explosión",
         "horror", "dramático", "escándalo", "urgente"
     ]):
         boost += 0.20
-
-    # signos
-    if "!" in title or '"' in title:
+    if "!" in title or title.count('"') >= 2:
         boost += 0.10
-
     return boost
 
 
-# ======================================================
-# HELPERS
-# ======================================================
-
-def _score(x):
+def _score(x) -> float:
     if isinstance(x, dict):
         return float(x.get("score", 0.0))
     return float(getattr(x, "points", 0.0))
 
-def _signals(x):
+
+def _signals(x) -> list:
     if isinstance(x, dict):
         return x.get("signals", x.get("reasons", []))
     return list(getattr(x, "reasons", []))
 
 
-# ======================================================
-# MAIN FUNCTION
-# ======================================================
-
 def analyze_context(text: str, url: str = "", title: str = "") -> dict:
 
     if not text or len(text.strip()) < 30:
         return {
-            "score": 0.0,
-            "level": "green",
-            "message": "Sin contenido suficiente",
-            "signals": [],
+            "score":      0.0,
+            "level":      "green",
+            "message":    "Sin contenido suficiente",
+            "signals":    [],
             "confidence": 0.0,
-            "insight": "",
-            "context": "general",
-            "pro": {}
+            "insight":    "",
+            "context":    "general",
+            "pro":        {}
         }
-
-    # DEBUG (para errores tipo MercadoLibre)
-    if len(text) < 80:
-        print("⚠️ TEXTO CORTO:", url)
 
     # ======================================================
     # CONTEXTO + FUENTE
     # ======================================================
 
-    context     = classify_context(text)
-    source_info = analyze_source(url, text)
-    trust       = source_info.get("trust_level", 0.55)
-
-    weights = adjust_weights(BASE_WEIGHTS.copy(), context, source_info)
-
+    context      = classify_context(text)
+    source_info  = analyze_source(url, text)
+    trust        = source_info.get("trust_level", 0.55)
+    weights      = adjust_weights(BASE_WEIGHTS.copy(), context, source_info)
     content_type = _detect_content_type(text, url)
 
     # ======================================================
-    # MÓDULOS
+    # MÓDULOS (12)
     # ======================================================
 
     credibility        = analyze_credibility(text)
@@ -176,8 +138,7 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
     narrative_patterns = analyze_narrative_patterns(text)
     hypothetical       = check_hypothetical(text)
     promises           = check_promises(text)
-
-    uncertainty        = detect_uncertainty(text, title, context)
+    uncertainty        = detect_uncertainty(text, title)
 
     authority_risk  = authority.get("score", 0.0)       if isinstance(authority, dict) else 0.0
     authority_bonus = authority.get("trust_bonus", 0.0) if isinstance(authority, dict) else 0.0
@@ -201,30 +162,19 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
         "uncertainty":        _score(uncertainty),
     }
 
-    # ======================================================
-    # PRIORITIZATION
-    # ======================================================
-
     scores = _apply_signal_prioritization(content_type, scores)
 
     # ======================================================
     # RISK SCORE
     # ======================================================
 
-    risk_score = sum(scores[k] * weights[k] for k in scores)
-
+    risk_score = sum(scores[k] * weights.get(k, 0.0) for k in scores)
     risk_score += _combo_boost(scores)
 
-    # 🔥 HEADLINE BOOST (CLAVE)
-    # fallback si no hay title
-    headline_source = title
-
-    if not headline_source or len(headline_source.strip()) < 10:
-        headline_source = text[:200]  # primeros caracteres del contenido
-
+    headline_source = title if title and len(title.strip()) >= 10 else text[:200]
     risk_score += _headline_boost(headline_source)
 
-    risk_score -= authority_bonus * weights["authority"]
+    risk_score -= authority_bonus * weights.get("authority", 0.10)
 
     # ======================================================
     # AJUSTE POR FUENTE
@@ -242,26 +192,18 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
         risk_score *= 1.15
 
     # ======================================================
-    # SEÑALES POSITIVAS
+    # SEÑALES POSITIVAS (reducen levemente)
     # ======================================================
 
     positive = 0.0
-
     if scores["emotions"] < 0.2:
         positive += 0.03
-
     if scores["urgency"] == 0:
         positive += 0.03
-
     if scores["contradictions"] == 0:
         positive += 0.04
 
     risk_score = max(0.0, risk_score - positive)
-
-    # ======================================================
-    # NORMALIZACIÓN
-    # ======================================================
-
     risk_score = max(0.0, min(risk_score, 1.0))
 
     # ======================================================
@@ -269,13 +211,13 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
     # ======================================================
 
     if risk_score < 0.30:
-        level = "green"
+        level   = "green"
         message = "Bajo riesgo estructural"
     elif risk_score < 0.60:
-        level = "yellow"
+        level   = "yellow"
         message = "Señales mixtas — lectura crítica recomendada"
     else:
-        level = "red"
+        level   = "red"
         message = "Presión narrativa significativa detectada"
 
     # ======================================================
@@ -283,58 +225,50 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
     # ======================================================
 
     all_signals = list(dict.fromkeys(
-        _signals(credibility) +
-        _signals(contradictions) +
-        _signals(authority) +
-        _signals(urgency) +
-        _signals(emotions) +
-        _signals(polarization) +
-        _signals(misinformation) +
-        _signals(scientific_claims) +
+        _signals(credibility)        +
+        _signals(contradictions)     +
+        _signals(authority)          +
+        _signals(urgency)            +
+        _signals(emotions)           +
+        _signals(polarization)       +
+        _signals(misinformation)     +
+        _signals(scientific_claims)  +
         _signals(narrative_patterns) +
-        _signals(hypothetical) +
-        _signals(promises) +
-        _signals(uncertainty) +
+        _signals(hypothetical)       +
+        _signals(promises)           +
+        _signals(uncertainty)        +
         source_info.get("signals", [])
     ))
 
     adjusted_signals = adjust_signals_by_context(all_signals, context)
 
     # ======================================================
-    # PRO
+    # CAPA PRO
     # ======================================================
 
- _scores_dict = {
-    "credibility":        _score(credibility),
-    "contradictions":     _score(contradictions),
-    "authority":          authority_risk,
-    "urgency":            _score(urgency),
-    "emotions":           _score(emotions),
-    "polarization":       _score(polarization),
-    "misinformation":     _score(misinformation),
-    "scientific_claims":  _score(scientific_claims),
-    "narrative_patterns": _score(narrative_patterns),
-    "hypothetical":       _score(hypothetical),
-    "promises":           _score(promises),
-    "uncertainty":        _score(uncertainty),
-}
-confidence = compute_confidence(_scores_dict)
+    confidence = compute_confidence(scores)
     patterns   = detect_patterns(adjusted_signals, risk_score)
     profile    = build_narrative_profile(adjusted_signals, risk_score)
     insight    = generate_insight(patterns, profile)
 
+    # ======================================================
+    # OUTPUT
+    # ======================================================
+
     return {
-        "score": round(risk_score, 2),
-        "level": level,
-        "message": message,
-        "signals": adjusted_signals[:6],
-        "confidence": round(confidence, 2),
-        "insight": insight,
-        "context": context,
+        "score":       round(risk_score, 2),
+        "level":       level,
+        "message":     message,
+        "signals":     adjusted_signals[:6],
+        "confidence":  round(confidence, 2),
+        "insight":     insight,
+        "context":     context,
         "source_type": source_info.get("type", "unknown"),
         "pro": {
-            "patterns": patterns,
+            "patterns":          patterns,
             "narrative_profile": profile,
-            "source": source_info,
+            "source":            source_info,
+            "context":           context,
+            "_scores":           {k: round(v, 3) for k, v in scores.items()},
         }
     }
