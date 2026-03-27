@@ -210,10 +210,10 @@ def analyze_context(text: str, url: str = "", title: str = "") -> dict:
     # CLASIFICACIÓN
     # ======================================================
 
-    if risk_score < 0.30:
+    if risk_score < 0.20:
         level   = "green"
         message = "Bajo riesgo estructural"
-    elif risk_score < 0.60:
+    elif risk_score < 0.55:
         level   = "yellow"
         message = "Señales mixtas — lectura crítica recomendada"
     else:
