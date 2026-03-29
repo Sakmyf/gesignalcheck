@@ -1,5 +1,5 @@
-# ======================================================
-# SIGNALCHECK – COMMERCIAL RISK v2
+## ======================================================
+# SIGNALCHECK – COMMERCIAL RISK v2.1
 # Detección de riesgo comercial / fraude contextual
 # ======================================================
 
@@ -58,6 +58,17 @@ LEGAL_PATTERNS = [
     "condiciones",
 ]
 
+SUSPICIOUS_TLDS = [
+    ".xyz", ".top", ".click", ".site", ".store", ".online"
+]
+
+PAYMENT_PRESSURE_PATTERNS = [
+    r"\bdepositá\b", r"\btransferí\b",
+    r"\bcbu\b", r"\bcvu\b",
+    r"\bclave token\b", r"\benviar dinero\b",
+    r"\bpago anticipado\b",
+]
+
 # ------------------------------------------------------
 # UTIL
 # ------------------------------------------------------
@@ -99,12 +110,16 @@ def analyze_commercial_risk(text: str, url: str = "") -> dict:
         }
 
     # --------------------------------------------------
-    # 2. DOMINIO DESCONOCIDO
+    # 2. DOMINIO DESCONOCIDO + TLD SOSPECHOSO
     # --------------------------------------------------
 
     if domain and not any(k in domain for k in KNOWN_DOMAINS):
         risk_score += 4
         signals.append("Dominio no reconocido o de baja reputación")
+
+    if domain and any(tld in domain for tld in SUSPICIOUS_TLDS):
+        risk_score += 3
+        signals.append("TLD asociado a sitios de alto riesgo")
 
     # --------------------------------------------------
     # 3. LOGIN / BLOQUEO
@@ -149,7 +164,15 @@ def analyze_commercial_risk(text: str, url: str = "") -> dict:
         signals.append("Ausencia de información legal identificable")
 
     # --------------------------------------------------
-    # 8. NORMALIZACIÓN (ANTI FALSO POSITIVO)
+    # 8. PRESIÓN DE PAGO / DATOS SENSIBLES
+    # --------------------------------------------------
+
+    if any(re.search(p, text_lower) for p in PAYMENT_PRESSURE_PATTERNS):
+        risk_score += 4
+        signals.append("Solicitud de transferencia o datos sensibles")
+
+    # --------------------------------------------------
+    # 9. NORMALIZACIÓN (ANTI FALSO POSITIVO)
     # --------------------------------------------------
 
     # Si el dominio es conocido, reducimos riesgo
@@ -189,5 +212,5 @@ def analyze_commercial_risk(text: str, url: str = "") -> dict:
         "level": level,
         "score": round(risk_score, 1),
         "summary": summary,
-        "signals": signals[:4]
+        "signals": signals[:5]
     }

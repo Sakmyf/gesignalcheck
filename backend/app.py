@@ -1,4 +1,4 @@
-print("APP FILE ACTUAL 12.1 - engine v12 integrated")
+print("APP FILE ACTUAL 13.6 - engine v13.6 integrated")
 
 import os
 import json
@@ -20,7 +20,8 @@ from backend.utils.content_versioning import (
 )
 
 API_VERSION    = "v3"
-ENGINE_VERSION = "v12.0"
+# 🔥 FIX: Sincronizado con engine.py para evitar errores de caché
+ENGINE_VERSION = "v13.6"
 PROMPT_VERSION = "none"
 
 PLAN_LIMITS = {
@@ -29,11 +30,15 @@ PLAN_LIMITS = {
     "enterprise":  0,
 }
 
-app = FastAPI(title="GE SignalCheck API — v12")
+app = FastAPI(title="GE SignalCheck API — v13.6")
+
+# 🔥 FIX: CORS Seguro leyendo desde las variables de entorno (o por defecto tu extensión)
+env_origins = os.getenv("ALLOWED_ORIGINS", "chrome-extension://ooigpgpbfjefbdjmhjpnmmakieioplc")
+allowed_origins = [origin.strip() for origin in env_origins.split(",") if origin.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins, # Ya no está abierto a "*"
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
