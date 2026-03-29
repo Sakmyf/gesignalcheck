@@ -3,6 +3,7 @@
 # FIX: Falsos positivos en sitios oficiales (Score 19)
 # ======================================================
 
+import traceback
 from backend.Analysis.credibility        import analyze          as analyze_credibility
 from backend.Analysis.contradictions     import analyze_contradictions
 from backend.Analysis.authority          import analyze_authority
@@ -45,117 +46,142 @@ BASE_WEIGHTS = {
 }
 
 def analyze_context(text: str, url: str = "", title: str = ""):
-    if not text:
-        return {"score": 0, "level": "green", "message": "Sin contenido para analizar"}
+    try:
+        if not text:
+            return {"score": 0, "level": "green", "message": "Sin contenido para analizar"}
 
-    # 1. Clasificación y Análisis de Fuente
-    context = classify_context(text, url)
-    source_info = analyze_source(url)
-    
-    # Ajuste dinámico de pesos según contexto y trust de fuente
-    weights = adjust_weights(BASE_WEIGHTS, context, source_info)
+        # 1. Clasificación y Análisis de Fuente
+        context = classify_context(text, url)
+        source_info = analyze_source(url)
+        
+        # Ajuste dinámico de pesos según contexto y trust de fuente
+        weights = adjust_weights(BASE_WEIGHTS, context, source_info)
 
-    # 2. Ejecución de Módulos Core
-    # NOTA: Se asegura que cada módulo entregue puntos normalizados (0-1)
-    credibility    = analyze_credibility(text)
-    contradictions = analyze_contradictions(text)
-    authority      = analyze_authority(text)
-    urgency        = check_urgency(text)
-    emotions       = check_emotions(text)
-    polarization   = check_polarization(text)
-    misinformation = check_misinformation(text)
-    scientific     = check_scientific_claims(text)
-    narrative      = analyze_narrative_patterns(text)
-    hypothetical   = check_hypothetical(text)
-    promises       = check_promises(text)
-    uncertainty    = detect_uncertainty(text, title, context)
+        # 2. Ejecución de Módulos Core
+        # NOTA: Se asegura que cada módulo entregue puntos normalizados (0-1)
+        credibility    = analyze_credibility(text)
+        contradictions = analyze_contradictions(text)
+        authority      = analyze_authority(text)
+        urgency        = check_urgency(text)
+        emotions       = check_emotions(text)
+        polarization   = check_polarization(text)
+        misinformation = check_misinformation(text)
+        scientific     = check_scientific_claims(text)
+        narrative      = analyze_narrative_patterns(text)
+        hypothetical   = check_hypothetical(text)
+        promises       = check_promises(text)
+        uncertainty    = detect_uncertainty(text, title, context)
 
-    # 3. Módulo Comercial (FIX: Normalización 10 -> 1)
-    comm_data = analyze_commercial_risk(text, url)
-    # Escala original 0-10 se reduce a 0-1 con tope de influencia en 0.25
-    comm_normalized = min(0.25, (comm_data.get("score", 0) / 10) * 0.5)
+        # 3. Módulo Comercial (FIX: Normalización 10 -> 1)
+        comm_data = analyze_commercial_risk(text, url)
+        # Escala original 0-10 se reduce a 0-1 con tope de influencia en 0.25
+        comm_normalized = min(0.25, (comm_data.get("score", 0) / 10) * 0.5)
 
-    # 4. Agregación de Scores con Pesos
-    def _get_p(res): 
-        if isinstance(res, dict):
-            return res.get("score", 0.0)
-        return getattr(res, "points", 0.0)
+        # 4. Agregación de Scores con Pesos
+        def _get_p(res): 
+            if isinstance(res, dict):
+                return res.get("score", 0.0)
+            return getattr(res, "points", 0.0)
 
-    scores = {
-        "credibility":        _get_p(credibility),
-        "contradictions":     _get_p(contradictions),
-        "authority":          _get_p(authority),
-        "urgency":            _get_p(urgency),
-        "emotions":           _get_p(emotions),
-        "polarization":       _get_p(polarization),
-        "misinformation":     _get_p(misinformation),
-        "scientific_claims":  _get_p(scientific),
-        "narrative_patterns": _get_p(narrative),
-        "hypothetical":       _get_p(hypothetical),
-        "promises":           _get_p(promises),
-        "uncertainty":        _get_p(uncertainty)
-    }
-
-    # Suma ponderada inicial
-    risk_score = sum(scores[k] * weights.get(k, 0.1) for k in scores)
-    
-    # Sumamos el riesgo comercial ya normalizado
-    risk_score += comm_normalized
-
-    # 5. Ajustes Especiales y Bonos
-    # Bono por Autoridad (FIX: Más fuerte para sitios institucionales)
-    trust_bonus = authority.get("trust_bonus", 0.0)
-    if context == "institutional":
-        risk_score -= (trust_bonus * 1.5) # Bono reforzado
-    else:
-        risk_score -= (trust_bonus * 0.5)
-
-    # 6. Normalización Final y Clasificación
-    risk_score = max(0.0, min(risk_score, 1.0))
-
-    if risk_score >= 0.55:
-        level, message = "red", "Presión narrativa significativa detectada"
-    elif risk_score >= 0.20:
-        level, message = "yellow", "Señales mixtas — lectura crítica recomendada"
-    else:
-        level, message = "green", "Bajo riesgo estructural detectado"
-
-    # 7. Consolidación de Señales (Evidencia)
-    def _signals(res): return res.reasons if hasattr(res, "reasons") else res.get("signals", [])
-
-    all_signals = list(dict.fromkeys(
-        _signals(credibility)    + _signals(contradictions) +
-        _signals(authority)      + _signals(urgency)        +
-        _signals(emotions)       + _signals(polarization)   +
-        _signals(misinformation) + _signals(scientific)     +
-        _signals(narrative)      + _signals(hypothetical)   +
-        _signals(promises)       + _signals(uncertainty)    +
-        source_info.get("signals", []) + comm_data.get("signals", [])
-    ))
-
-    # Limpiar y priorizar señales por contexto
-    adjusted_signals = adjust_signals_by_context(all_signals, context)
-
-    # 8. Generación de Metadatos PRO
-    confidence = compute_confidence(scores)
-    patterns   = detect_patterns(adjusted_signals, risk_score)
-    profile    = build_narrative_profile(adjusted_signals, risk_score)
-    insight    = generate_insight(patterns, profile)
-
-    return {
-        "score":       round(risk_score, 2),
-        "level":       level,
-        "message":     message,
-        "signals":     adjusted_signals[:6],
-        "confidence":  round(confidence, 2),
-        "insight":     insight,
-        "context":     context,
-        "source_type": source_info.get("type", "unknown"),
-        "commercial_risk": comm_data,
-        "pro": {
-            "patterns": patterns,
-            "narrative_profile": profile,
-            "context_note": f"Análisis en modo {context}",
-            "_scores": scores
+        scores = {
+            "credibility":        _get_p(credibility),
+            "contradictions":     _get_p(contradictions),
+            "authority":          _get_p(authority),
+            "urgency":            _get_p(urgency),
+            "emotions":           _get_p(emotions),
+            "polarization":       _get_p(polarization),
+            "misinformation":     _get_p(misinformation),
+            "scientific_claims":  _get_p(scientific),
+            "narrative_patterns": _get_p(narrative),
+            "hypothetical":       _get_p(hypothetical),
+            "promises":           _get_p(promises),
+            "uncertainty":        _get_p(uncertainty)
         }
-    }
+
+        # Suma ponderada inicial
+        risk_score = sum(scores[k] * weights.get(k, 0.1) for k in scores)
+        
+        # Sumamos el riesgo comercial ya normalizado
+        risk_score += comm_normalized
+
+        # 5. Ajustes Especiales y Bonos
+        # Bono por Autoridad (FIX: Más fuerte para sitios institucionales y protección contra errores de tipo)
+        trust_bonus = authority.get("trust_bonus", 0.0) if isinstance(authority, dict) else getattr(authority, "trust_bonus", 0.0)
+        if context == "institutional":
+            risk_score -= (trust_bonus * 1.5) # Bono reforzado
+        else:
+            risk_score -= (trust_bonus * 0.5)
+
+        # 6. Normalización Final y Clasificación
+        risk_score = max(0.0, min(risk_score, 1.0))
+
+        if risk_score >= 0.55:
+            level, message = "red", "Presión narrativa significativa detectada"
+        elif risk_score >= 0.20:
+            level, message = "yellow", "Señales mixtas — lectura crítica recomendada"
+        else:
+            level, message = "green", "Bajo riesgo estructural detectado"
+
+        # 7. Consolidación de Señales (Evidencia)
+        # FIX: Protección contra errores de tipo si un módulo devuelve un dict o una clase
+        def _signals(res): 
+            if isinstance(res, dict):
+                return res.get("signals", [])
+            return getattr(res, "reasons", [])
+
+        all_signals = list(dict.fromkeys(
+            _signals(credibility)    + _signals(contradictions) +
+            _signals(authority)      + _signals(urgency)        +
+            _signals(emotions)       + _signals(polarization)   +
+            _signals(misinformation) + _signals(scientific)     +
+            _signals(narrative)      + _signals(hypothetical)   +
+            _signals(promises)       + _signals(uncertainty)    +
+            source_info.get("signals", []) + comm_data.get("signals", [])
+        ))
+
+        # Limpiar y priorizar señales por contexto
+        adjusted_signals = adjust_signals_by_context(all_signals, context)
+
+        # 8. Generación de Metadatos PRO
+        confidence = compute_confidence(scores)
+        patterns   = detect_patterns(adjusted_signals, risk_score)
+        profile    = build_narrative_profile(adjusted_signals, risk_score)
+        insight    = generate_insight(patterns, profile)
+
+        return {
+            "score":       round(risk_score, 2),
+            "level":       level,
+            "message":     message,
+            "signals":     adjusted_signals[:6],
+            "confidence":  round(confidence, 2),
+            "insight":     insight,
+            "context":     context,
+            "source_type": source_info.get("type", "unknown"),
+            "commercial_risk": comm_data,
+            "pro": {
+                "patterns": patterns,
+                "narrative_profile": profile,
+                "context_note": f"Análisis en modo {context}",
+                "_scores": scores
+            }
+        }
+
+    except Exception as e:
+        # Si algo falla, atrapamos el error para que la extensión no se quede colgada
+        print(f"CRITICAL ENGINE ERROR en {url}:")
+        traceback.print_exc() # Esto imprimirá la línea exacta del error en la consola de tu servidor
+        
+        return {
+            "score": 0,
+            "level": "yellow", 
+            "message": "No se pudo completar el análisis (error en el motor).",
+            "signals": [f"Error interno: {str(e)}"],
+            "confidence": 0,
+            "insight": "Hubo un fallo al procesar la información de esta página.",
+            "context": "error",
+            "source_type": "unknown",
+            "commercial_risk": {},
+            "pro": {
+                "error_trace": traceback.format_exc()
+            }
+        }
