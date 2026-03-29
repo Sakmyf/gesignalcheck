@@ -58,7 +58,6 @@ def analyze_context(text: str, url: str = "", title: str = ""):
         weights = adjust_weights(BASE_WEIGHTS, context, source_info)
 
         # 2. Ejecución de Módulos Core
-        # NOTA: Se asegura que cada módulo entregue puntos normalizados (0-1)
         credibility    = analyze_credibility(text)
         contradictions = analyze_contradictions(text)
         authority      = analyze_authority(text)
@@ -72,9 +71,8 @@ def analyze_context(text: str, url: str = "", title: str = ""):
         promises       = check_promises(text)
         uncertainty    = detect_uncertainty(text, title, context)
 
-        # 3. Módulo Comercial (FIX: Normalización 10 -> 1)
+        # 3. Módulo Comercial 
         comm_data = analyze_commercial_risk(text, url)
-        # Escala original 0-10 se reduce a 0-1 con tope de influencia en 0.25
         comm_normalized = min(0.25, (comm_data.get("score", 0) / 10) * 0.5)
 
         # 4. Agregación de Scores con Pesos
@@ -98,17 +96,31 @@ def analyze_context(text: str, url: str = "", title: str = ""):
             "uncertainty":        _get_p(uncertainty)
         }
 
-        # Suma ponderada inicial
         risk_score = sum(scores[k] * weights.get(k, 0.1) for k in scores)
-        
-        # Sumamos el riesgo comercial ya normalizado
         risk_score += comm_normalized
 
-        # 5. Ajustes Especiales y Bonos
-        # Bono por Autoridad (FIX: Más fuerte para sitios institucionales y protección contra errores de tipo)
+        # =========================================================
+        # 5. AJUSTES ESPECIALES Y BONOS (FIX: SÚPER BONO HISPANO)
+        # =========================================================
         trust_bonus = authority.get("trust_bonus", 0.0) if isinstance(authority, dict) else getattr(authority, "trust_bonus", 0.0)
-        if context == "institutional":
-            risk_score -= (trust_bonus * 1.5) # Bono reforzado
+        
+        url_lower = url.lower() if url else ""
+        
+        # Dominios oficiales de LATAM, España y entidades globales puras
+        gov_suffixes = [
+            ".gob.ar", ".gov.ar", ".gob.cl", ".gov.cl", ".gob.pe", ".gob.mx", 
+            ".gob.es", ".gov.co", ".gob.ec", ".gob.bo", ".gob.ve", ".gub.uy", 
+            ".gov.py", ".gob.do", ".gob.sv", ".gob.gt", ".gob.hn", ".gob.ni", 
+            ".gob.pa", ".go.cr", ".pr.gov"
+        ]
+        
+        is_ibero_gov = any(s in url_lower for s in gov_suffixes)
+
+        if is_ibero_gov:
+            # Neutralizador masivo: Borra hasta ~25 puntos de "ruido burocrático"
+            risk_score -= (trust_bonus * 3.0) + 0.15 
+        elif context == "institutional":
+            risk_score -= (trust_bonus * 1.5) 
         else:
             risk_score -= (trust_bonus * 0.5)
 
@@ -122,8 +134,7 @@ def analyze_context(text: str, url: str = "", title: str = ""):
         else:
             level, message = "green", "Bajo riesgo estructural detectado"
 
-        # 7. Consolidación de Señales (Evidencia)
-        # FIX: Protección contra errores de tipo si un módulo devuelve un dict o una clase
+        # 7. Consolidación de Señales
         def _signals(res): 
             if isinstance(res, dict):
                 return res.get("signals", [])
@@ -139,7 +150,6 @@ def analyze_context(text: str, url: str = "", title: str = ""):
             source_info.get("signals", []) + comm_data.get("signals", [])
         ))
 
-        # Limpiar y priorizar señales por contexto
         adjusted_signals = adjust_signals_by_context(all_signals, context)
 
         # 8. Generación de Metadatos PRO
@@ -167,9 +177,8 @@ def analyze_context(text: str, url: str = "", title: str = ""):
         }
 
     except Exception as e:
-        # Si algo falla, atrapamos el error para que la extensión no se quede colgada
         print(f"CRITICAL ENGINE ERROR en {url}:")
-        traceback.print_exc() # Esto imprimirá la línea exacta del error en la consola de tu servidor
+        traceback.print_exc() 
         
         return {
             "score": 0,

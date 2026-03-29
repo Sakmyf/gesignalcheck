@@ -23,7 +23,7 @@ from backend.utils.content_versioning import (
 API_VERSION    = "v3"
 # 🔥 FIX: Sincronizado con engine.py para evitar errores de caché
 ENGINE_VERSION = "v13.6"
-PROMPT_VERSION = "v2"
+PROMPT_VERSION = "v3"
 
 PLAN_LIMITS = {
     "free":       50,
