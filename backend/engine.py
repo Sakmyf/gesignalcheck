@@ -76,7 +76,10 @@ def analyze_context(text: str, url: str = "", title: str = ""):
     comm_normalized = min(0.25, (comm_data.get("score", 0) / 10) * 0.5)
 
     # 4. Agregación de Scores con Pesos
-    def _get_p(res): return getattr(res, "points", res.get("score", 0.0))
+    def _get_p(res): 
+        if isinstance(res, dict):
+            return res.get("score", 0.0)
+        return getattr(res, "points", 0.0)
 
     scores = {
         "credibility":        _get_p(credibility),
