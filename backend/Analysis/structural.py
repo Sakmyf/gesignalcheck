@@ -22,37 +22,52 @@ def check_structural(text: str) -> RuleResult:
 
     result = RuleResult()
     text_lower = text.lower()
+    text_length = len(text)
 
-    # 🔴 Generalizaciones absolutas repetidas
+    # ======================================================
+    # 1. 🔴 Generalizaciones absolutas (Lógica Proporcional)
+    # ======================================================
     absolute_count = sum(len(re.findall(p, text_lower)) for p in ABSOLUTES)
+    
+    # Calculamos cuántos "miles de caracteres" tiene el texto
+    text_length_k = max(1.0, text_length / 1000.0)
+    
+    # Permitimos ~4 términos absolutos por cada 1,000 caracteres
+    allowed_absolutes = int(text_length_k * 4)
 
-    if absolute_count >= 2:
-        result.points += 0.8
+    if absolute_count > allowed_absolutes:
+        # Solo penalizamos el EXCESO
+        excess = absolute_count - allowed_absolutes
+        score_addition = min(0.8, excess * 0.1) # Tope máximo de 0.8
+        
+        result.points += score_addition
         result.reasons.append("absolute_generalization")
         result.evidence.append(
-            f"Generalizaciones absolutas detectadas ({absolute_count})"
+            f"Uso desproporcionado de generalizaciones (encontradas {absolute_count}, esperado max {allowed_absolutes})"
         )
 
-    # 🟠 Clickbait estructural
-    for p in CLICKBAIT_PATTERNS:
-        if re.search(p, text_lower):
-            result.points += 0.7
-            result.reasons.append("clickbait_structure")
-            result.evidence.append(f"Patrón clickbait detectado: {p}")
+    # ======================================================
+    # 2. 🟠 Clickbait estructural (Ajuste Escalonado)
+    # ======================================================
+    clickbait_matches = [p for p in CLICKBAIT_PATTERNS if re.search(p, text_lower)]
+    
+    if clickbait_matches:
+        # En lugar de sumar 0.7 de golpe, sumamos 0.2 por cada patrón encontrado
+        score_addition = min(0.7, len(clickbait_matches) * 0.2)
+        
+        result.points += score_addition
+        result.reasons.append("clickbait_structure")
+        result.evidence.append(f"Patrones clickbait detectados: {', '.join(clickbait_matches)}")
 
-    # 🟡 Exceso de mayúsculas
-    uppercase_ratio = sum(1 for c in text if c.isupper()) / max(len(text), 1)
+    # ======================================================
+    # 3. 🟡 Exceso de mayúsculas (Mantiene su lógica de ratio)
+    # ======================================================
+    uppercase_ratio = sum(1 for c in text if c.isupper()) / max(text_length, 1)
 
-    if uppercase_ratio > 0.25 and len(text) > 30:
+    if uppercase_ratio > 0.25 and text_length > 30:
         result.points += 0.6
         result.reasons.append("excessive_uppercase")
-        result.evidence.append("Uso excesivo de mayúsculas")
-
-    # 🟡 Exclamaciones múltiples
-    if text.count("!") >= 3:
-        result.points += 0.5
-        result.reasons.append("excessive_exclamations")
-        result.evidence.append("Uso reiterado de exclamaciones")
+        result.evidence.append(f"Uso excesivo de mayúsculas ({int(uppercase_ratio * 100)}%)")
 
     return result
 

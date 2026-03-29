@@ -1,16 +1,17 @@
 import re
 from backend.Analysis.rules_types import RuleResult
 
-
+# 🔥 FIX: Pasamos de palabras sueltas ("urgente", "inmediato") a patrones de presión
 URGENCY_PATTERNS = [
-    r"\burgente\b",
     r"última oportunidad",
     r"actu[aá] ahora",
-    r"inmediato",
-    r"antes de que lo borren",
+    r"antes (de )?que lo borren",
     r"compart[ií] antes que lo eliminen",
+    r"solo\s+por\s+hoy",
+    r"tiempo\s+limitado",
+    r"oferta\s+(termina|finaliza)",
+    r"decisión\s+inmediata" 
 ]
-
 
 def check_urgency(text: str) -> RuleResult:
 
@@ -28,10 +29,9 @@ def check_urgency(text: str) -> RuleResult:
 
         result.points += score
         result.reasons.append("urgency_pressure")
-        result.evidence.append(f"Urgency patterns detected ({matches})")
+        result.evidence.append(f"Patrones de urgencia detectados ({matches})")
 
     return result
-
 
 def analyze(text: str):
     return check_urgency(text)

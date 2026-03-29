@@ -101,20 +101,27 @@ def detect_uncertainty(text: str, title: str = "", context: str = "general") -> 
         result.evidence.append("Datos numéricos sin fuente sólida")
 
     # ======================================================
-    # CASE 2 — CONDITIONAL LANGUAGE
+    # CASE 2 — CONDITIONAL LANGUAGE (EXCESIVO)
     # ======================================================
+    # 🔥 FIX: Lógica Proporcional al largo del texto
+    
+    conditional_count = sum(len(re.findall(p, t)) for p in CONDITIONAL_PATTERNS)
+    
+    # Calculamos cuántos "miles de caracteres" tiene el texto (min 1)
+    text_length_k = max(1.0, len(text) / 1000.0)
+    
+    # Tolerancia: Es normal usar ~3 condicionales cada 1.000 caracteres en español
+    allowed_conditionals = int(text_length_k * 3)
 
-    conditional_matches = [p for p in CONDITIONAL_PATTERNS if re.search(p, t)]
-
-    if len(conditional_matches) >= 2:
-        uncertainty_score += 0.20
-        result.reasons.append("conditional_as_fact")
-        result.evidence.append(f"Lenguaje condicional fuerte ({len(conditional_matches)})")
-
-    elif len(conditional_matches) == 1:
-        uncertainty_score += 0.10
-        result.reasons.append("conditional_language")
-        result.evidence.append("Lenguaje condicional detectado")
+    if conditional_count > allowed_conditionals:
+        # Solo penalizamos el EXCESO de condicionales
+        excess = conditional_count - allowed_conditionals
+        uncertainty_score += min(0.3, excess * 0.05)
+        
+        result.reasons.append("excessive_conditional_language")
+        result.evidence.append(
+            f"Uso excesivo de condicionales (encontrados {conditional_count}, esperado max {allowed_conditionals})"
+        )
 
     # ======================================================
     # CASE 3 — CATEGORICAL CLAIM WITHOUT BACKING
