@@ -9,37 +9,49 @@
 
   <div class="container">
 
-    <!-- HEADER -->
+    <div id="scanLine" class="scan-line"></div>
+
     <div class="header">
       <h1>SignalCheck</h1>
       <div class="subtitle">Análisis estructural del contenido</div>
     </div>
 
-    <!-- BADGE -->
-    <div id="labelBadge" class="signal-label">Analizando...</div>
+    <div id="labelBadge" class="signal-label">Iniciando...</div>
 
-    <!-- LOADER -->
-    <div class="loader" id="loader"></div>
-
-    <!-- RESUMEN -->
-    <div id="summary" class="hidden"></div>
-
-    <!-- CONTEXT NOTE (PRO) -->
-    <div id="contextNote" class="context-note hidden"></div>
-
-    <!-- SEÑALES -->
-    <ul id="signalsList" class="hidden"></ul>
-
-    <!-- SCORE (PRO) -->
-    <div id="scoreContainer" class="score hidden">
-      Índice estructural: <span id="scoreValue">0.00</span>
+    <div class="score-container">
+      <div class="score-main">
+        <span id="scoreValue">--</span>
+        <span class="score-label">/100</span>
+      </div>
+      <div class="confidence">
+        Confianza: <span id="confidenceValue">--</span>%
+      </div>
     </div>
 
-    <!-- ERROR -->
+    <div id="summary" class="hidden insight-box"></div>
+
+    <div class="pro-section locked" id="proSection">
+
+      <div class="pro-title">🔍 Análisis avanzado</div>
+
+      <ul class="pro-list">
+        <li>Emocionalidad: <span id="pro-emocionalidad">🔒</span></li>
+        <li>Manipulación: <span id="pro-manipulacion">🔒</span></li>
+        <li>Evidencia: <span id="pro-evidencia">🔒</span></li>
+        <li>Coherencia: <span id="pro-coherencia">🔒</span></li>
+      </ul>
+
+      <button id="upgradeBtn" class="upgrade-btn">
+        Desbloquear análisis completo
+      </button>
+
+    </div>
+
     <div id="error"></div>
 
-    <!-- BOTÓN -->
-    <button id="analyzeBtn">Analizar página</button>
+    <button id="analyzeBtn" style="margin-top: 10px; width: 100%; padding: 10px; border-radius: 8px; border: none; background: #1e293b; color: white; cursor: pointer; font-weight: bold;">
+      Re-analizar página
+    </button>
 
   </div>
 
