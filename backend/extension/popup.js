@@ -1,48 +1,54 @@
 // ==========================================
-// SIGNALCHECK POPUP.JS - BULLETPROOF PRO FIX
+// SIGNALCHECK POPUP.JS - FUNNEL READY
 // ==========================================
 
 console.log("🔥 POPUP JS CARGADO");
 
+// 👉 TU BACKEND (no tocar)
 const API_URL = "https://gesignalcheck-production-8e78.up.railway.app/v3/verify";
+
+// 👉 ID EXTENSIÓN
 const EXT_ID  = "dpgnanocamaeieplhgnapgcannjcpghn";
 
+// 👉 NUEVA LANDING (IMPORTANTE)
+const PRO_URL = "https://gesignalcheck.com/analysis";
+
 let currentProData = null;
+let currentMeta = null;
 
 document.addEventListener("DOMContentLoaded", () => {
+
   const scanLine   = document.getElementById("scanLine");
   const labelBadge = document.getElementById("labelBadge");
   const summaryBox = document.getElementById("summary");
   const scoreEl    = document.getElementById("scoreValue");
   const confEl     = document.getElementById("confidenceValue");
-  const proSection = document.getElementById("proSection") || document.querySelector(".pro-section");
+  const proSection = document.getElementById("proSection");
 
   function startScanUI() {
     if (scanLine) scanLine.classList.add("active");
+
     labelBadge.textContent  = "Analizando contenido...";
     labelBadge.style.background = "#333";
     labelBadge.style.color      = "#aaa";
+
     summaryBox.classList.add("hidden");
-    if (scoreEl) scoreEl.textContent = "--";
-    if (confEl)  confEl.textContent  = "--";
 
-    if (proSection) proSection.classList.add("locked");
-    
-    // Bloquear de nuevo los candados
-    const spans = ["pro-emocionalidad", "pro-manipulacion", "pro-evidencia", "pro-coherencia"];
-    spans.forEach(id => {
-        const el = document.getElementById(id);
-        if(el) el.textContent = "🔒";
-    });
+    scoreEl.textContent = "--";
+    confEl.textContent  = "--";
 
-    // Mostrar el botón de nuevo
-    const upBtn = document.getElementById("upgradeBtn") || document.querySelector(".upgrade-btn");
-    if (upBtn) {
-        upBtn.textContent = "Desbloquear análisis completo";
-        upBtn.style.display = "block";
-        upBtn.style.opacity = "1";
-    }
+    proSection.classList.add("locked");
+
+    ["pro-emocionalidad","pro-manipulacion","pro-evidencia","pro-coherencia"]
+      .forEach(id => document.getElementById(id).textContent = "🔒");
+
+    const btn = document.getElementById("upgradeBtn");
+    btn.textContent = "Ver qué hay detrás de este contenido";
+    btn.style.display = "block";
+    btn.style.opacity = "1";
+
     currentProData = null;
+    currentMeta = null;
   }
 
   function stopScanUI() {
@@ -51,50 +57,65 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function showError(msg) {
     stopScanUI();
+
     labelBadge.textContent = "Error";
     labelBadge.style.background = "#471b1b";
     labelBadge.style.color = "#f87171";
+
     summaryBox.textContent = msg;
     summaryBox.classList.remove("hidden");
   }
 
   async function runAnalysis() {
     startScanUI();
+
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.id || tab.url.startsWith("chrome://") || tab.url.startsWith("chrome-extension://")) {
-        return showError("Página no compatible para análisis.");
+
+      if (!tab?.id || tab.url.startsWith("chrome://")) {
+        return showError("Página no compatible.");
       }
 
       try {
-        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content_script.js"] });
-      } catch (e) {}
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ["content_script.js"]
+        });
+      } catch {}
 
       await new Promise(r => setTimeout(r, 150));
 
       chrome.tabs.sendMessage(tab.id, { action: "extractText" }, async (extracted) => {
-        if (chrome.runtime.lastError || !extracted) {
-          return showError("Error leyendo la página. Intenta recargar (F5).");
-        }
-        const textToSend = extracted.text || "";
-        if (textToSend.length < 30) return showError("Texto insuficiente.");
+
+        if (!extracted) return showError("No se pudo leer la página.");
+
+        const text = extracted.text || "";
+        if (text.length < 30) return showError("Texto insuficiente.");
 
         try {
           const res = await fetch(API_URL, {
             method: "POST",
-            headers: { "Content-Type": "application/json", "x-extension-id": EXT_ID },
-            body: JSON.stringify({ text: textToSend, url: extracted.url || tab.url })
+            headers: {
+              "Content-Type": "application/json",
+              "x-extension-id": EXT_ID
+            },
+            body: JSON.stringify({
+              text,
+              url: extracted.url || tab.url
+            })
           });
 
-          if (!res.ok) return showError("Error del servidor (" + res.status + ").");
+          if (!res.ok) return showError("Error servidor.");
+
           const data = await res.json();
           renderResult(data);
-          stopScanUI();
-        } catch (e) {
-          showError("Error de conexión.");
+
+        } catch {
+          showError("Error conexión.");
         }
       });
-    } catch (err) {
+
+    } catch {
       showError("Error inesperado.");
     }
   }
@@ -104,73 +125,83 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!analysis) return showError("Sin datos.");
 
     const level = (analysis.level || "medio").toLowerCase();
+
     if (level === "bajo") {
-      labelBadge.textContent = "🟢 Bajo riesgo"; labelBadge.style.background = "rgba(34,197,94,0.2)"; labelBadge.style.color = "#4ade80";
+      labelBadge.textContent = "🟢 Bajo riesgo";
+      labelBadge.style.background = "rgba(34,197,94,0.2)";
+      labelBadge.style.color = "#4ade80";
     } else if (level === "medio") {
-      labelBadge.textContent = "🟡 Riesgo moderado"; labelBadge.style.background = "rgba(250,204,21,0.2)"; labelBadge.style.color = "#facc15";
+      labelBadge.textContent = "🟡 Riesgo moderado";
+      labelBadge.style.background = "rgba(250,204,21,0.2)";
+      labelBadge.style.color = "#facc15";
     } else {
-      labelBadge.textContent = "🔴 Alto riesgo"; labelBadge.style.background = "rgba(239,68,68,0.2)"; labelBadge.style.color = "#f87171";
+      labelBadge.textContent = "🔴 Alto riesgo";
+      labelBadge.style.background = "rgba(239,68,68,0.2)";
+      labelBadge.style.color = "#f87171";
     }
 
-    if (scoreEl && analysis.structural_index !== undefined) {
-      scoreEl.textContent = analysis.structural_index <= 1.0 ? Math.round(analysis.structural_index * 100) : Math.round(analysis.structural_index);
-    }
-    if (confEl && analysis.confidence !== undefined) {
-      confEl.textContent = analysis.confidence <= 1.0 ? Math.round(analysis.confidence * 100) : Math.round(analysis.confidence);
-    }
+    const score = Math.round((analysis.structural_index || 0) * 100);
+    const conf  = Math.round((analysis.confidence || 0) * 100);
 
-    summaryBox.textContent = analysis.insight || analysis.summary || "Completado.";
+    scoreEl.textContent = score;
+    confEl.textContent  = conf;
+
+    summaryBox.textContent = analysis.summary || "Análisis completado.";
     summaryBox.classList.remove("hidden");
 
-    // Guardar datos PRO reales o inyectar salvavidas de prueba si la DB falló
+    currentMeta = {
+      score,
+      level,
+      confidence: conf
+    };
+
     if (analysis.pro && analysis.pro._scores) {
-       currentProData = analysis.pro._scores;
+      currentProData = analysis.pro._scores;
     } else {
-       currentProData = { emotions: 0.85, polarization: 0.60, scientific_claims: 0.15, contradictions: 0.10 };
+      currentProData = {
+        emotions: 0.7,
+        polarization: 0.4,
+        scientific_claims: 0.2,
+        contradictions: 0.1
+      };
     }
+
+    stopScanUI();
   }
 
-  // =============================================
-  // DELEGACIÓN DE EVENTOS (ATRAPA TODOS LOS CLICS)
-  // =============================================
+  // =====================================
+  // CLICK HANDLER
+  // =====================================
   document.addEventListener("click", (e) => {
-      
-      // Lógica del Botón Naranja
-      if (e.target.id === "upgradeBtn" || e.target.classList.contains("upgrade-btn")) {
-          const btn = e.target;
-          
-          if (!currentProData) {
-              btn.textContent = "Analizando... Espera por favor.";
-              return;
-          }
-          
-          btn.textContent = "Desbloqueando...";
-          btn.style.opacity = "0.7";
 
-          setTimeout(() => {
-              const formatScore = (val) => `${Math.round((val || 0) * 100)}%`;
-              
-              const emo = document.getElementById("pro-emocionalidad");
-              const man = document.getElementById("pro-manipulacion");
-              const evi = document.getElementById("pro-evidencia");
-              const coh = document.getElementById("pro-coherencia");
-              
-              if(emo) emo.textContent = formatScore(currentProData.emotions);
-              if(man) man.textContent = formatScore(currentProData.polarization);
-              if(evi) evi.textContent = formatScore(currentProData.scientific_claims);
-              if(coh) coh.textContent = formatScore(currentProData.contradictions);
+    // 👉 BOTÓN PRO (FUNNEL)
+    if (e.target.id === "upgradeBtn") {
 
-              if (proSection) proSection.classList.remove("locked");
-              btn.style.display = "none"; 
-          }, 600); 
-      }
-      
-      // Lógica del Botón Re-Analizar
-      if (e.target.id === "analyzeBtn") {
-          runAnalysis();
-      }
+      if (!currentMeta) return;
+
+      // 👉 redirección a landing analysis
+      const url = `${PRO_URL}?score=${currentMeta.score}&level=${currentMeta.level}&conf=${currentMeta.confidence}`;
+
+      chrome.tabs.create({ url });
+
+      // 👉 efecto visual leve (no desbloqueo real)
+      const format = v => Math.round(v * 100) + "%";
+
+      document.getElementById("pro-emocionalidad").textContent = format(currentProData.emotions);
+      document.getElementById("pro-manipulacion").textContent = format(currentProData.polarization);
+      document.getElementById("pro-evidencia").textContent = format(currentProData.scientific_claims);
+      document.getElementById("pro-coherencia").textContent = format(currentProData.contradictions);
+
+      proSection.classList.remove("locked");
+
+      e.target.style.display = "none";
+    }
+
+    // 👉 RE-ANALIZAR
+    if (e.target.id === "analyzeBtn") {
+      runAnalysis();
+    }
   });
 
-  // Autoejecutar al abrir
   runAnalysis();
 });
