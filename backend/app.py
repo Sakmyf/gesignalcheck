@@ -2,6 +2,7 @@ print("APP FILE ACTUAL 13.6 - engine v13.6 integrated")
 
 import os
 import json
+import traceback
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Header, Depends
@@ -146,10 +147,13 @@ async def verify(
         context    = result.get("context", "general")
 
     except Exception as e:
-        print("🔥 ERROR EN ANALISIS:", str(e))
+        error_details = traceback.format_exc()
+        print("🔥 ERROR EN ANALISIS:", error_details)
+        
         score        = 0.0
         result       = {"score": 0, "signals": [], "context_note": "Error en análisis"}
-        summary      = "No se pudo completar el análisis."
+        # 🔥 Ahora la extensión nos mostrará exactamente qué se rompió:
+        summary      = f"Error interno: {str(e)}" 
         insight      = ""
         confidence   = 0.0
         context      = "general"
