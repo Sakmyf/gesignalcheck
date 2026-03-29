@@ -12,11 +12,8 @@ if (!window.__SignalCheckInjected__) {
   // ------------------------------------------------------
   // UTILIDAD: LIMPIAR TEXTO
   // ------------------------------------------------------
-
   function normalizeText(text) {
-
     if (!text) return "";
-
     return text
       .replace(/\s+/g, " ")
       .replace(/\n+/g, " ")
@@ -27,13 +24,11 @@ if (!window.__SignalCheckInjected__) {
   // ------------------------------------------------------
   // DETECTAR CONTENEDOR PRINCIPAL
   // ------------------------------------------------------
-
   function detectMainContainer() {
-
     const selectors = [
       "article",
+      "[role='main']", // Fundamental para Facebook y Twitter
       "main",
-      "[role='main']",
       ".content",
       "#content",
       ".post",
@@ -41,120 +36,87 @@ if (!window.__SignalCheckInjected__) {
     ];
 
     for (const selector of selectors) {
-
       const el = document.querySelector(selector);
-
       if (el && el.innerText && el.innerText.length > 200) {
         return el;
       }
-
     }
-
     return document.body;
-
   }
 
   // ------------------------------------------------------
   // LIMPIAR ELEMENTOS IRRELEVANTES
   // ------------------------------------------------------
-
   function cleanDOM(container) {
+    // 🔥 FIX 1: Jamás clonar el document.body entero en sitios masivos
+    if (container === document.body) {
+      return null; 
+    }
 
     const cloned = container.cloneNode(true);
 
     const selectorsToRemove = [
-      "script",
-      "style",
-      "noscript",
-      "svg",
-      "img",
-      "video",
-      "canvas",
-      "iframe",
-      "header",
-      "footer",
-      "nav",
-      "aside",
-      "form",
-      "button",
-      ".advertisement",
-      ".ads",
-      ".banner",
-      ".popup"
+      "script", "style", "noscript", "svg", "img", "video", "canvas", "iframe",
+      "header", "footer", "nav", "aside", "form", "button",
+      ".advertisement", ".ads", ".banner", ".popup"
     ];
 
     const elements = cloned.querySelectorAll(selectorsToRemove.join(","));
-
     elements.forEach(el => el.remove());
 
     return cloned;
-
   }
 
   // ------------------------------------------------------
   // EXTRAER TEXTO LIMPIO
   // ------------------------------------------------------
-
   function extractCleanText() {
-
     if (!document.body) return "";
 
     try {
-
       const container = detectMainContainer();
-
       const cleaned = cleanDOM(container);
 
-      let text = cleaned.innerText || "";
+      let text = "";
 
-      text = normalizeText(text);
-
-      // 🔒 fallback si contenido es muy corto
-      if (text.length < 200) {
-
-        text = normalizeText(document.body.innerText || "");
-
+      if (cleaned) {
+        // 🔥 FIX 2: textContent no calcula estilos, no crashea en nodos desconectados
+        text = normalizeText(cleaned.textContent || "");
       }
 
-      // limitar tamaño para backend
+      // 🔒 Fallback seguro: Si no hay texto o se usó document.body
+      if (!text || text.length < 200) {
+        text = normalizeText(document.body.innerText || "");
+      }
+
       return text.substring(0, 20000);
 
     } catch (err) {
-
       console.warn("⚠ fallback extracción:", err);
-
       return normalizeText(document.body.innerText || "").substring(0, 20000);
-
     }
-
   }
 
   // ------------------------------------------------------
-  // LISTENER EXTENSION (FIX CLAVE)
+  // LISTENER EXTENSION
   // ------------------------------------------------------
-
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-
-    // 🔥 FIX: aceptar ambos formatos (popup viejo y nuevo)
     if (!request || (request.action !== "extractText" && request.type !== "GET_PAGE_CONTENT")) {
       return;
     }
 
     try {
-
       const cleanText = extractCleanText();
 
       sendResponse({
-        ok: true, // 🔥 IMPORTANTE para popup
+        ok: true, 
         text: cleanText,
         url: window.location.href,
         title: document.title || ""
       });
 
     } catch (error) {
-
       console.error("❌ Error extrayendo texto:", error);
-
       sendResponse({
         ok: false,
         text: "",
@@ -162,11 +124,8 @@ if (!window.__SignalCheckInjected__) {
         title: document.title || "",
         error: true
       });
-
     }
 
-    return true; // 🔥 CRÍTICO para async en Chrome
-
+    return true; 
   });
-
 }
