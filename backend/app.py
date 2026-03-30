@@ -1,15 +1,20 @@
-print("APP FILE ACTUAL 13.6 - engine v13.6 integrated")
+print("APP FILE ACTUAL 13.8 - SECURE PRODUCTION READY")
 
 import os
 import json
 import traceback
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi import FastAPI, HTTPException, Header, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from urllib.parse import urlparse
+
+# 🔐 RATE LIMIT
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from backend.database import engine, get_db
 from backend.models import Base, Extension, AnalysisLog
@@ -21,8 +26,7 @@ from backend.utils.content_versioning import (
 )
 
 API_VERSION    = "v3"
-# 🔥 FIX: Sincronizado con engine.py para evitar errores de caché
-ENGINE_VERSION = "v13.6"
+ENGINE_VERSION = "v13.8"
 PROMPT_VERSION = "v3"
 
 PLAN_LIMITS = {
@@ -31,15 +35,40 @@ PLAN_LIMITS = {
     "enterprise":  0,
 }
 
-app = FastAPI(title="GE SignalCheck API — v13.6")
+app = FastAPI(title="GE SignalCheck API — v13.8")
 
-# 🔥 FIX: CORS Seguro leyendo desde las variables de entorno (o por defecto tu extensión)
-env_origins = os.getenv("ALLOWED_ORIGINS", "chrome-extension://ooigpgpbfjefbdjmhjpnmmakieioplc")
-allowed_origins = [origin.strip() for origin in env_origins.split(",") if origin.strip()]
+# =========================
+# 🔐 RATE LIMIT KEY (MEJORADO)
+# =========================
+def get_rate_key(request: Request):
+    ext = request.headers.get("x-extension-id")
+    if ext:
+        return f"ext:{ext}"
+    return get_remote_address(request)
+
+limiter = Limiter(key_func=get_rate_key)
+app.state.limiter = limiter
+
+@app.exception_handler(RateLimitExceeded)
+def rate_limit_handler(request: Request, exc):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Demasiadas solicitudes. Intente más tarde."}
+    )
+
+# =========================
+# 🔐 CORS
+# =========================
+env_origins = os.getenv(
+    "ALLOWED_ORIGINS",
+    "chrome-extension://ooigpgpbfjefbdjmhjpnmmakieioplc"
+)
+
+allowed_origins = [o.strip() for o in env_origins.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins, # Ya no está abierto a "*"
+    allow_origins=allowed_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,6 +78,9 @@ app.add_middleware(
 def startup_event():
     Base.metadata.create_all(bind=engine)
 
+# =========================
+# MODELS
+# =========================
 class VerifyRequest(BaseModel):
     url: str
     text: str
@@ -61,12 +93,23 @@ def root():
 def health():
     return {"status": "ok", "engine": ENGINE_VERSION}
 
+# =========================
+# 🔥 ENDPOINT PROTEGIDO
+# =========================
 @app.post("/v3/verify")
+@limiter.limit("20/minute")
 async def verify(
+    request: Request,
     data: VerifyRequest,
     x_extension_id: str = Header(None),
     db: Session = Depends(get_db)
 ):
+
+    # 🔐 BLOQUEO BOT BÁSICO
+    user_agent = request.headers.get("user-agent", "").lower()
+    if any(bot in user_agent for bot in ["curl", "python", "wget", "httpclient"]):
+        raise HTTPException(status_code=403, detail="Cliente bloqueado")
+
     if not x_extension_id:
         raise HTTPException(status_code=401, detail="Extensión no identificada")
 
@@ -74,6 +117,7 @@ async def verify(
         Extension.extension_id == x_extension_id.strip()
     ).first()
 
+    # 🧠 AUTO-REGISTRO
     if not extension:
         extension = Extension(
             extension_id=x_extension_id.strip(),
@@ -89,12 +133,17 @@ async def verify(
     if not extension.is_active:
         raise HTTPException(status_code=403, detail="Extensión desactivada")
 
+    # 🔐 VALIDACIONES
     if not data.text or len(data.text.strip()) < 30:
         raise HTTPException(status_code=400, detail="Texto insuficiente")
+
+    if len(data.text) > 20000:
+        raise HTTPException(status_code=400, detail="Texto demasiado largo")
 
     text = data.text
     url  = data.url or ""
 
+    # 🔐 CACHE KEY
     content_hash = generate_content_hash(text)
     analysis_key = build_analysis_key(
         url=url,
@@ -103,6 +152,7 @@ async def verify(
         prompt_version=PROMPT_VERSION
     )
 
+    # 🔁 CACHE HIT
     cached_log = db.query(AnalysisLog).filter(
         AnalysisLog.analysis_key == analysis_key
     ).first()
@@ -116,6 +166,7 @@ async def verify(
         except Exception:
             pass
 
+    # 🔐 LÍMITE POR PLAN
     if extension.analyses_limit > 0 and extension.analyses_used >= extension.analyses_limit:
         raise HTTPException(
             status_code=429,
@@ -127,6 +178,7 @@ async def verify(
             }
         )
 
+    # 🧠 ANALYSIS
     try:
         result = analyze_context(text, url)
         result = apply_context_adjustment(result)
@@ -138,6 +190,7 @@ async def verify(
             "yellow": ("yellow", "medio"),
             "red":    ("red",    "alto"),
         }
+
         adjusted_level      = result.get("level", "yellow")
         status_color, level = _LEVEL_MAP.get(adjusted_level, ("yellow", "medio"))
 
@@ -147,13 +200,11 @@ async def verify(
         context    = result.get("context", "general")
 
     except Exception as e:
-        error_details = traceback.format_exc()
-        print("🔥 ERROR EN ANALISIS:", error_details)
-        
+        print("🔥 ERROR EN ANALISIS:", traceback.format_exc())
+
         score        = 0.0
-        result       = {"score": 0, "signals": [], "context_note": "Error en análisis"}
-        # 🔥 Ahora la extensión nos mostrará exactamente qué se rompió:
-        summary      = f"Error interno: {str(e)}" 
+        result       = {"score": 0, "signals": []}
+        summary      = f"Error interno: {str(e)}"
         insight      = ""
         confidence   = 0.0
         context      = "general"
@@ -179,7 +230,6 @@ async def verify(
             "indicators":       indicators,
             "shown_indicators": len(indicators),
             "structural_index": score,
-            "context_note":     result.get("context_note", ""),
             "status_color":     status_color,
             "pro":              result.get("pro", {})
         },
@@ -192,21 +242,16 @@ async def verify(
         }
     }
 
-    _s = result.get("pro", {}).get("_scores", {})
-
+    # 💾 GUARDADO
     try:
         analysis_log = AnalysisLog(
-            trust_score      = _s.get("source_trust",   0.0),
-            narrative_score  = _s.get("credibility",    0.0),
-            rhetorical_score = _s.get("misinformation", 0.0),
-            absence_score    = _s.get("urgency",        0.0),
             risk_index       = score,
             level            = level,
-            premium_requested= False,
             engine_version   = ENGINE_VERSION,
             analysis_key     = analysis_key,
             response_json    = json.dumps(response_payload)
         )
+
         db.add(analysis_log)
         extension.analyses_used += 1
         db.commit()
