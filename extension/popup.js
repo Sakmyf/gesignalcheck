@@ -10,12 +10,20 @@ document.addEventListener("DOMContentLoaded", () => {
   const scoreEl    = document.getElementById("scoreValue");
   const confEl     = document.getElementById("confidenceValue");
 
+  // 🔥 BOTÓN PRO (ROBUSTO)
+  const unlockBtn =
+    document.getElementById("upgradeBtn") ||   // el correcto
+    document.getElementById("unlockBtn")  ||   // fallback viejo
+    document.querySelector("button.upgrade-btn"); // fallback extra
+
   function startScanUI() {
     if (scanLine) scanLine.classList.add("active");
-    labelBadge.textContent  = "Analizando contenido...";
-    labelBadge.style.background = "#333";
-    labelBadge.style.color      = "#aaa";
-    summaryBox.classList.add("hidden");
+    if (labelBadge) {
+      labelBadge.textContent  = "Analizando contenido...";
+      labelBadge.style.background = "#333";
+      labelBadge.style.color      = "#aaa";
+    }
+    if (summaryBox) summaryBox.classList.add("hidden");
     if (scoreEl) scoreEl.textContent = "--";
     if (confEl)  confEl.textContent  = "--";
   }
@@ -36,12 +44,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
       if (!tab?.id || tab.url.startsWith("chrome://") || tab.url.startsWith("chrome-extension://")) {
-        labelBadge.textContent = "Página no compatible";
+        if (labelBadge) labelBadge.textContent = "Página no compatible";
         stopScanUI();
         return;
       }
 
-      // Asegurar content script inyectado
       try {
         await chrome.scripting.executeScript({
           target: { tabId: tab.id },
@@ -54,7 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
       chrome.tabs.sendMessage(tab.id, { action: "extractText" }, async (extracted) => {
 
         if (chrome.runtime.lastError || !extracted) {
-          labelBadge.textContent = "Error leyendo página";
+          if (labelBadge) labelBadge.textContent = "Error leyendo página";
           stopScanUI();
           return;
         }
@@ -62,7 +69,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const textToSend = extracted.text || "";
 
         if (textToSend.length < 30) {
-          labelBadge.textContent = "Texto insuficiente";
+          if (labelBadge) labelBadge.textContent = "Texto insuficiente";
           stopScanUI();
           return;
         }
@@ -82,7 +89,7 @@ document.addEventListener("DOMContentLoaded", () => {
           });
 
           if (!res.ok) {
-            labelBadge.textContent = "Error del servidor (" + res.status + ")";
+            if (labelBadge) labelBadge.textContent = "Error del servidor (" + res.status + ")";
             stopScanUI();
             return;
           }
@@ -97,7 +104,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         } catch (e) {
           console.error("❌ fetch error:", e);
-          labelBadge.textContent = "Error de conexión";
+          if (labelBadge) labelBadge.textContent = "Error de conexión";
           stopScanUI();
         }
 
@@ -105,7 +112,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     } catch (err) {
       console.error("❌ Error general:", err);
-      labelBadge.textContent = "Error inesperado";
+      if (labelBadge) labelBadge.textContent = "Error inesperado";
       stopScanUI();
     }
   }
@@ -117,47 +124,37 @@ document.addEventListener("DOMContentLoaded", () => {
     const analysis = data?.analysis || data;
 
     if (!analysis) {
-      labelBadge.textContent = "Sin datos";
+      if (labelBadge) labelBadge.textContent = "Sin datos";
       return;
     }
 
-    // =============================================
-    // LEVEL → badge
-    // FIX: leer analysis.level (no analysis.status)
-    // =============================================
     const level = (analysis.level || "medio").toLowerCase();
 
-    if (level === "bajo") {
-      labelBadge.textContent      = "🟢 Bajo riesgo";
-      labelBadge.style.background = "rgba(34,197,94,0.2)";
-      labelBadge.style.color      = "#4ade80";
-    } else if (level === "medio") {
-      labelBadge.textContent      = "🟡 Riesgo moderado";
-      labelBadge.style.background = "rgba(250,204,21,0.2)";
-      labelBadge.style.color      = "#facc15";
-    } else {
-      labelBadge.textContent      = "🔴 Alto riesgo";
-      labelBadge.style.background = "rgba(239,68,68,0.2)";
-      labelBadge.style.color      = "#f87171";
+    if (labelBadge) {
+      if (level === "bajo") {
+        labelBadge.textContent      = "🟢 Bajo riesgo";
+        labelBadge.style.background = "rgba(34,197,94,0.2)";
+        labelBadge.style.color      = "#4ade80";
+      } else if (level === "medio") {
+        labelBadge.textContent      = "🟡 Riesgo moderado";
+        labelBadge.style.background = "rgba(250,204,21,0.2)";
+        labelBadge.style.color      = "#facc15";
+      } else {
+        labelBadge.textContent      = "🔴 Alto riesgo";
+        labelBadge.style.background = "rgba(239,68,68,0.2)";
+        labelBadge.style.color      = "#f87171";
+      }
     }
 
-    // =============================================
-    // SCORE
-    // FIX: leer structural_index (no score)
-    // =============================================
     const rawScore = analysis.structural_index;
 
     if (scoreEl && rawScore !== undefined) {
-      // El engine devuelve 0.0–1.0, mostrar como 0–100
       const display = rawScore <= 1.0
         ? Math.round(rawScore * 100)
         : Math.round(rawScore);
       scoreEl.textContent = display;
     }
 
-    // =============================================
-    // CONFIDENCE
-    // =============================================
     const conf = analysis.confidence;
     if (confEl && conf !== undefined) {
       const display = conf <= 1.0
@@ -166,20 +163,35 @@ document.addEventListener("DOMContentLoaded", () => {
       confEl.textContent = display;
     }
 
-    // =============================================
-    // SUMMARY / INSIGHT
-    // =============================================
-    summaryBox.textContent =
-      analysis.insight  ||
-      analysis.summary  ||
-      analysis.message  ||
-      "Análisis completado.";
+    if (summaryBox) {
+      summaryBox.textContent =
+        analysis.insight  ||
+        analysis.summary  ||
+        analysis.message  ||
+        "Análisis completado.";
+      summaryBox.classList.remove("hidden");
+    }
+  }
 
-    summaryBox.classList.remove("hidden");
+  // ============================
+  // 🚀 BOTÓN PRO (FUNCIONA SIEMPRE)
+  // ============================
+  if (unlockBtn) {
+    unlockBtn.addEventListener("click", () => {
+
+      console.log("🚀 Click PRO detectado");
+
+      chrome.tabs.create({
+        url: "https://gesignalcheck.com/analysis"
+      });
+
+    });
+  } else {
+    console.warn("⚠️ Botón PRO no encontrado (revisar HTML)");
   }
 
   // Auto-run + botón manual
   runAnalysis();
-  analyzeBtn.addEventListener("click", runAnalysis);
+  if (analyzeBtn) analyzeBtn.addEventListener("click", runAnalysis);
 
 });
