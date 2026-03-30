@@ -1,5 +1,4 @@
 const API_URL = "https://gesignalcheck-production-8e78.up.railway.app/v3/verify";
-const EXT_ID  = "dpgnanocamaeieplhgnapgcannjcpghn";
 
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -12,17 +11,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 🔥 BOTÓN PRO (ROBUSTO)
   const unlockBtn =
-    document.getElementById("upgradeBtn") ||   // el correcto
-    document.getElementById("unlockBtn")  ||   // fallback viejo
-    document.querySelector("button.upgrade-btn"); // fallback extra
+    document.getElementById("upgradeBtn") ||
+    document.getElementById("unlockBtn")  ||
+    document.querySelector("button.upgrade-btn");
 
   function startScanUI() {
     if (scanLine) scanLine.classList.add("active");
+
     if (labelBadge) {
       labelBadge.textContent  = "Analizando contenido...";
       labelBadge.style.background = "#333";
       labelBadge.style.color      = "#aaa";
     }
+
     if (summaryBox) summaryBox.classList.add("hidden");
     if (scoreEl) scoreEl.textContent = "--";
     if (confEl)  confEl.textContent  = "--";
@@ -80,7 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "x-extension-id": EXT_ID
+              "x-extension-id": chrome.runtime.id
             },
             body: JSON.stringify({
               text: textToSend,
@@ -97,6 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const data = await res.json();
 
           const wait = Math.max(0, MIN_TIME - (Date.now() - startTime));
+
           setTimeout(() => {
             renderResult(data);
             stopScanUI();
@@ -156,6 +158,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const conf = analysis.confidence;
+
     if (confEl && conf !== undefined) {
       const display = conf <= 1.0
         ? Math.round(conf * 100)
@@ -169,14 +172,16 @@ document.addEventListener("DOMContentLoaded", () => {
         analysis.summary  ||
         analysis.message  ||
         "Análisis completado.";
+
       summaryBox.classList.remove("hidden");
     }
   }
 
   // ============================
-  // 🚀 BOTÓN PRO (FUNCIONA SIEMPRE)
+  // 🚀 BOTÓN PRO
   // ============================
   if (unlockBtn) {
+
     unlockBtn.addEventListener("click", () => {
 
       console.log("🚀 Click PRO detectado");
@@ -186,12 +191,16 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
     });
+
   } else {
     console.warn("⚠️ Botón PRO no encontrado (revisar HTML)");
   }
 
-  // Auto-run + botón manual
+  // AUTO-RUN + BOTÓN
   runAnalysis();
-  if (analyzeBtn) analyzeBtn.addEventListener("click", runAnalysis);
+
+  if (analyzeBtn) {
+    analyzeBtn.addEventListener("click", runAnalysis);
+  }
 
 });
