@@ -15,6 +15,8 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("unlockBtn")  ||
     document.querySelector("button.upgrade-btn");
 
+  const proSection = document.querySelector(".pro-section");
+
   function startScanUI() {
     if (scanLine) scanLine.classList.add("active");
 
@@ -174,6 +176,23 @@ document.addEventListener("DOMContentLoaded", () => {
         "Análisis completado.";
 
       summaryBox.classList.remove("hidden");
+    }
+
+    // ============================
+    // 🔐 CONTROL PRO (NUEVO)
+    // ============================
+    const plan = data?.meta?.plan || "free";
+
+    if (plan === "free") {
+
+      if (proSection) proSection.classList.add("locked");
+      if (unlockBtn) unlockBtn.style.display = "block";
+
+    } else {
+
+      if (proSection) proSection.classList.remove("locked");
+      if (unlockBtn) unlockBtn.style.display = "none";
+
     }
   }
 

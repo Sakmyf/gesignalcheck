@@ -122,7 +122,7 @@ async def verify(
         extension = Extension(
             extension_id=x_extension_id.strip(),
             is_active=True,
-            plan="free",
+            plan="pro",
             analyses_used=0,
             analyses_limit=PLAN_LIMITS["free"]
         )
