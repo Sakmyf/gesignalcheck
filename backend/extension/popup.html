@@ -7,44 +7,81 @@
 </head>
 <body>
   <div class="container">
+
+    <!-- SCAN -->
     <div id="scanLine" class="scan-line"></div>
 
+    <!-- HEADER -->
     <div class="header">
       <h1>SignalCheck</h1>
       <div class="subtitle">Análisis estructural del contenido</div>
     </div>
 
+    <!-- RESULTADO -->
     <div id="labelBadge" class="signal-label">Iniciando...</div>
 
+    <!-- SCORE -->
     <div class="score-container">
       <div class="score-main">
         <span id="scoreValue">--</span>
         <span class="score-label">/100</span>
       </div>
+
       <div class="confidence">
         Confianza: <span id="confidenceValue">--</span>%
       </div>
     </div>
 
+    <!-- INSIGHT -->
     <div id="summary" class="hidden insight-box"></div>
 
+    <!-- 🔒 PRO SECTION -->
     <div class="pro-section locked" id="proSection">
+
       <div class="pro-title">🔍 Análisis avanzado</div>
+
       <ul class="pro-list">
         <li>Emocionalidad: <span id="pro-emocionalidad">🔒</span></li>
         <li>Manipulación: <span id="pro-manipulacion">🔒</span></li>
         <li>Evidencia: <span id="pro-evidencia">🔒</span></li>
         <li>Coherencia: <span id="pro-coherencia">🔒</span></li>
       </ul>
-      <button id="upgradeBtn" class="upgrade-btn">Desbloquear análisis completo</button>
+
+      <!-- BOTÓN UPGRADE -->
+      <button id="upgradeBtn" class="upgrade-btn">
+        Desbloquear análisis completo
+      </button>
+
+      <!-- 🔥 ACTIVACIÓN PRO -->
+      <div style="margin-top:10px; display:flex; gap:5px;">
+        <input 
+          id="proTokenInput"
+          placeholder="Código PRO"
+          style="flex:1; padding:6px; border-radius:6px; border:none; background:#111; color:#fff;"
+        />
+
+        <button 
+          id="activateProBtn"
+          style="padding:6px 10px; border-radius:6px; border:none; background:#16a34a; color:white; font-weight:bold; cursor:pointer;"
+        >
+          Activar
+        </button>
+      </div>
+
     </div>
 
+    <!-- ERROR -->
     <div id="error"></div>
 
-    <button id="analyzeBtn" style="margin-top: 10px; width: 100%; padding: 10px; border-radius: 8px; border: none; background: #1e293b; color: white; cursor: pointer; font-weight: bold;">
+    <!-- BOTÓN ANALIZAR -->
+    <button id="analyzeBtn"
+      style="margin-top: 10px; width: 100%; padding: 10px; border-radius: 8px; border: none; background: #1e293b; color: white; cursor: pointer; font-weight: bold;">
       Re-analizar página
     </button>
+
   </div>
+
   <script src="popup.js"></script>
+
 </body>
 </html>

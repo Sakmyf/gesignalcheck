@@ -1,22 +1,19 @@
 // ==========================================
-// SIGNALCHECK POPUP.JS - FUNNEL READY
+// SIGNALCHECK POPUP.JS - FUNNEL + PRO REAL
 // ==========================================
 
 console.log("🔥 POPUP JS CARGADO");
 
-// 👉 TU BACKEND (no tocar)
+// 👉 BACKEND
 const API_URL = "https://gesignalcheck-production-8e78.up.railway.app/v3/verify";
 
-// 👉 ID EXTENSIÓN
-const EXT_ID  = "dpgnanocamaeieplhgnapgcannjcpghn";
-
-// 👉 NUEVA LANDING (IMPORTANTE)
+// 👉 LANDING
 const PRO_URL = "https://gesignalcheck.com/analysis";
 
 let currentProData = null;
 let currentMeta = null;
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
 
   const scanLine   = document.getElementById("scanLine");
   const labelBadge = document.getElementById("labelBadge");
@@ -24,6 +21,32 @@ document.addEventListener("DOMContentLoaded", () => {
   const scoreEl    = document.getElementById("scoreValue");
   const confEl     = document.getElementById("confidenceValue");
   const proSection = document.getElementById("proSection");
+
+  const tokenInput = document.getElementById("proTokenInput");
+  const activateBtn = document.getElementById("activateProBtn");
+
+  let storedToken = "";
+
+  // 🔐 LEER TOKEN GUARDADO
+  const stored = await chrome.storage.local.get("pro_token");
+  storedToken = stored.pro_token || "";
+
+  // =========================
+  // 🔓 ACTIVAR PRO
+  // =========================
+  if (activateBtn && tokenInput) {
+    activateBtn.addEventListener("click", () => {
+
+      const token = tokenInput.value.trim();
+      if (!token) return;
+
+      chrome.storage.local.set({ pro_token: token }, () => {
+        storedToken = token;
+        alert("✅ PRO activado. Reanalizá la página.");
+      });
+
+    });
+  }
 
   function startScanUI() {
     if (scanLine) scanLine.classList.add("active");
@@ -45,7 +68,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const btn = document.getElementById("upgradeBtn");
     btn.textContent = "Ver qué hay detrás de este contenido";
     btn.style.display = "block";
-    btn.style.opacity = "1";
 
     currentProData = null;
     currentMeta = null;
@@ -93,11 +115,13 @@ document.addEventListener("DOMContentLoaded", () => {
         if (text.length < 30) return showError("Texto insuficiente.");
 
         try {
+
           const res = await fetch(API_URL, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "x-extension-id": EXT_ID
+              "x-extension-id": chrome.runtime.id,
+              "x-pro-token": storedToken || ""
             },
             body: JSON.stringify({
               text,
@@ -121,8 +145,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function renderResult(data) {
+
     const analysis = data?.analysis || data;
     if (!analysis) return showError("Sin datos.");
+
+    const plan = data?.meta?.plan || "free";
 
     const level = (analysis.level || "medio").toLowerCase();
 
@@ -149,55 +176,44 @@ document.addEventListener("DOMContentLoaded", () => {
     summaryBox.textContent = analysis.summary || "Análisis completado.";
     summaryBox.classList.remove("hidden");
 
-    currentMeta = {
-      score,
-      level,
-      confidence: conf
-    };
+    currentMeta = { score, level, confidence: conf };
 
-    if (analysis.pro && analysis.pro._scores) {
-      currentProData = analysis.pro._scores;
+    // =========================
+    // 🔐 PRO REAL
+    // =========================
+    if (plan === "pro") {
+
+      proSection.classList.remove("locked");
+
+      document.getElementById("upgradeBtn").style.display = "none";
+
+      // ejemplo visual real
+      ["pro-emocionalidad","pro-manipulacion","pro-evidencia","pro-coherencia"]
+        .forEach(id => document.getElementById(id).textContent = "✔");
+
     } else {
-      currentProData = {
-        emotions: 0.7,
-        polarization: 0.4,
-        scientific_claims: 0.2,
-        contradictions: 0.1
-      };
+
+      proSection.classList.add("locked");
+      document.getElementById("upgradeBtn").style.display = "block";
     }
 
     stopScanUI();
   }
 
-  // =====================================
-  // CLICK HANDLER
-  // =====================================
+  // =========================
+  // FUNNEL (BOTÓN PRO)
+  // =========================
   document.addEventListener("click", (e) => {
 
-    // 👉 BOTÓN PRO (FUNNEL)
     if (e.target.id === "upgradeBtn") {
 
       if (!currentMeta) return;
 
-      // 👉 redirección a landing analysis
       const url = `${PRO_URL}?score=${currentMeta.score}&level=${currentMeta.level}&conf=${currentMeta.confidence}`;
 
       chrome.tabs.create({ url });
-
-      // 👉 efecto visual leve (no desbloqueo real)
-      const format = v => Math.round(v * 100) + "%";
-
-      document.getElementById("pro-emocionalidad").textContent = format(currentProData.emotions);
-      document.getElementById("pro-manipulacion").textContent = format(currentProData.polarization);
-      document.getElementById("pro-evidencia").textContent = format(currentProData.scientific_claims);
-      document.getElementById("pro-coherencia").textContent = format(currentProData.contradictions);
-
-      proSection.classList.remove("locked");
-
-      e.target.style.display = "none";
     }
 
-    // 👉 RE-ANALIZAR
     if (e.target.id === "analyzeBtn") {
       runAnalysis();
     }

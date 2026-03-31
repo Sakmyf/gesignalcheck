@@ -1,4 +1,4 @@
-print("APP FILE ACTUAL 13.8 - SECURE PRODUCTION READY")
+print("APP FILE ACTUAL 14.0 - PRO TOKEN ENABLED")
 
 import os
 import json
@@ -26,7 +26,7 @@ from backend.utils.content_versioning import (
 )
 
 API_VERSION    = "v3"
-ENGINE_VERSION = "v13.8"
+ENGINE_VERSION = "v14.0"
 PROMPT_VERSION = "v3"
 
 PLAN_LIMITS = {
@@ -35,10 +35,10 @@ PLAN_LIMITS = {
     "enterprise":  0,
 }
 
-app = FastAPI(title="GE SignalCheck API — v13.8")
+app = FastAPI(title="GE SignalCheck API — v14.0")
 
 # =========================
-# 🔐 RATE LIMIT KEY (MEJORADO)
+# 🔐 RATE LIMIT KEY
 # =========================
 def get_rate_key(request: Request):
     ext = request.headers.get("x-extension-id")
@@ -102,10 +102,11 @@ async def verify(
     request: Request,
     data: VerifyRequest,
     x_extension_id: str = Header(None),
+    x_pro_token: str = Header(None),  # 🔥 NUEVO
     db: Session = Depends(get_db)
 ):
 
-    # 🔐 BLOQUEO BOT BÁSICO
+    # 🔐 BLOQUEO BOT
     user_agent = request.headers.get("user-agent", "").lower()
     if any(bot in user_agent for bot in ["curl", "python", "wget", "httpclient"]):
         raise HTTPException(status_code=403, detail="Cliente bloqueado")
@@ -122,9 +123,10 @@ async def verify(
         extension = Extension(
             extension_id=x_extension_id.strip(),
             is_active=True,
-            plan="pro",
+            plan="free",
             analyses_used=0,
-            analyses_limit=PLAN_LIMITS["free"]
+            analyses_limit=PLAN_LIMITS["free"],
+            pro_token=None
         )
         db.add(extension)
         db.commit()
@@ -133,7 +135,18 @@ async def verify(
     if not extension.is_active:
         raise HTTPException(status_code=403, detail="Extensión desactivada")
 
-    # 🔐 VALIDACIONES
+    # =========================
+    # 🔥 ACTIVACIÓN PRO POR TOKEN
+    # =========================
+    if x_pro_token:
+        if extension.pro_token and x_pro_token == extension.pro_token:
+            extension.plan = "pro"
+        else:
+            extension.plan = "free"
+
+    # =========================
+    # VALIDACIONES
+    # =========================
     if not data.text or len(data.text.strip()) < 30:
         raise HTTPException(status_code=400, detail="Texto insuficiente")
 
@@ -143,7 +156,9 @@ async def verify(
     text = data.text
     url  = data.url or ""
 
-    # 🔐 CACHE KEY
+    # =========================
+    # CACHE
+    # =========================
     content_hash = generate_content_hash(text)
     analysis_key = build_analysis_key(
         url=url,
@@ -152,7 +167,6 @@ async def verify(
         prompt_version=PROMPT_VERSION
     )
 
-    # 🔁 CACHE HIT
     cached_log = db.query(AnalysisLog).filter(
         AnalysisLog.analysis_key == analysis_key
     ).first()
@@ -166,19 +180,24 @@ async def verify(
         except Exception:
             pass
 
-    # 🔐 LÍMITE POR PLAN
-    if extension.analyses_limit > 0 and extension.analyses_used >= extension.analyses_limit:
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "error": "limite_alcanzado",
-                "used":  extension.analyses_used,
-                "limit": extension.analyses_limit,
-                "plan":  extension.plan,
-            }
-        )
+    # =========================
+    # LIMITES
+    # =========================
+    if extension.plan == "free":
+        if extension.analyses_limit > 0 and extension.analyses_used >= extension.analyses_limit:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": "limite_alcanzado",
+                    "used":  extension.analyses_used,
+                    "limit": extension.analyses_limit,
+                    "plan":  extension.plan,
+                }
+            )
 
-    # 🧠 ANALYSIS
+    # =========================
+    # ANALYSIS
+    # =========================
     try:
         result = analyze_context(text, url)
         result = apply_context_adjustment(result)
@@ -242,7 +261,9 @@ async def verify(
         }
     }
 
-    # 💾 GUARDADO
+    # =========================
+    # SAVE
+    # =========================
     try:
         analysis_log = AnalysisLog(
             risk_index       = score,
@@ -253,7 +274,10 @@ async def verify(
         )
 
         db.add(analysis_log)
-        extension.analyses_used += 1
+
+        if extension.plan == "free":
+            extension.analyses_used += 1
+
         db.commit()
 
     except Exception as db_error:
