@@ -1,4 +1,4 @@
-print("APP FILE ACTUAL 14.0 - PRO TOKEN ENABLED")
+print("APP FILE ACTUAL 14.1 - PRO UX LAYER ENABLED")
 
 import os
 import json
@@ -11,7 +11,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-# 🔐 RATE LIMIT
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -26,7 +25,7 @@ from backend.utils.content_versioning import (
 )
 
 API_VERSION    = "v3"
-ENGINE_VERSION = "v14.0"
+ENGINE_VERSION = "v14.1"
 PROMPT_VERSION = "v3"
 
 PLAN_LIMITS = {
@@ -35,10 +34,58 @@ PLAN_LIMITS = {
     "enterprise":  0,
 }
 
-app = FastAPI(title="GE SignalCheck API — v14.0")
+app = FastAPI(title="GE SignalCheck API — v14.1")
 
 # =========================
-# 🔐 RATE LIMIT KEY
+# 🔥 PRO LAYER (NUEVO)
+# =========================
+def build_pro_layer(signals, commercial_risk, score):
+
+    # 🧨 ALERTA
+    if commercial_risk.get("level") == "alto":
+        alert = "Patrón típico de riesgo comercial detectado"
+    elif score >= 0.55:
+        alert = "Alta presión narrativa detectada"
+    elif score >= 0.25:
+        alert = "Señales mixtas, requiere lectura crítica"
+    else:
+        alert = "Contenido estructuralmente estable"
+
+    # 🧠 INTERPRETACIÓN
+    if "urgency" in " ".join(signals).lower():
+        interpretation = "El contenido intenta generar urgencia para reducir el análisis crítico."
+    elif "promises" in " ".join(signals).lower():
+        interpretation = "Se detectan afirmaciones fuertes que pueden no estar respaldadas."
+    else:
+        interpretation = "El contenido presenta patrones estructurales que pueden influir en la interpretación."
+
+    # 🎯 ACCIÓN
+    if commercial_risk.get("level") in ["medio", "alto"]:
+        action = "Evitar pagos directos o decisiones sin verificar la fuente."
+    elif score >= 0.5:
+        action = "No tomar decisiones inmediatas. Verificar información antes de actuar."
+    else:
+        action = "Leer con criterio crítico y validar fuentes si es necesario."
+
+    # 🧩 PERFIL
+    if commercial_risk.get("level") == "alto":
+        profile = "Contenido comercial de alto riesgo"
+    elif score >= 0.55:
+        profile = "Contenido con presión narrativa significativa"
+    elif score >= 0.25:
+        profile = "Contenido con señales mixtas"
+    else:
+        profile = "Contenido estructuralmente estable"
+
+    return {
+        "alert": alert,
+        "interpretation": interpretation,
+        "action": action,
+        "content_profile": profile
+    }
+
+# =========================
+# 🔐 RATE LIMIT
 # =========================
 def get_rate_key(request: Request):
     ext = request.headers.get("x-extension-id")
@@ -94,7 +141,7 @@ def health():
     return {"status": "ok", "engine": ENGINE_VERSION}
 
 # =========================
-# 🔥 ENDPOINT PROTEGIDO
+# ENDPOINT
 # =========================
 @app.post("/v3/verify")
 @limiter.limit("20/minute")
@@ -102,11 +149,10 @@ async def verify(
     request: Request,
     data: VerifyRequest,
     x_extension_id: str = Header(None),
-    x_pro_token: str = Header(None),  # 🔥 NUEVO
+    x_pro_token: str = Header(None),
     db: Session = Depends(get_db)
 ):
 
-    # 🔐 BLOQUEO BOT
     user_agent = request.headers.get("user-agent", "").lower()
     if any(bot in user_agent for bot in ["curl", "python", "wget", "httpclient"]):
         raise HTTPException(status_code=403, detail="Cliente bloqueado")
@@ -118,7 +164,6 @@ async def verify(
         Extension.extension_id == x_extension_id.strip()
     ).first()
 
-    # 🧠 AUTO-REGISTRO
     if not extension:
         extension = Extension(
             extension_id=x_extension_id.strip(),
@@ -135,18 +180,12 @@ async def verify(
     if not extension.is_active:
         raise HTTPException(status_code=403, detail="Extensión desactivada")
 
-    # =========================
-    # 🔥 ACTIVACIÓN PRO POR TOKEN
-    # =========================
     if x_pro_token:
         if extension.pro_token and x_pro_token == extension.pro_token:
             extension.plan = "pro"
         else:
             extension.plan = "free"
 
-    # =========================
-    # VALIDACIONES
-    # =========================
     if not data.text or len(data.text.strip()) < 30:
         raise HTTPException(status_code=400, detail="Texto insuficiente")
 
@@ -156,9 +195,6 @@ async def verify(
     text = data.text
     url  = data.url or ""
 
-    # =========================
-    # CACHE
-    # =========================
     content_hash = generate_content_hash(text)
     analysis_key = build_analysis_key(
         url=url,
@@ -180,107 +216,60 @@ async def verify(
         except Exception:
             pass
 
-    # =========================
-    # LIMITES
-    # =========================
-    if extension.plan == "free":
-        if extension.analyses_limit > 0 and extension.analyses_used >= extension.analyses_limit:
-            raise HTTPException(
-                status_code=429,
-                detail={
-                    "error": "limite_alcanzado",
-                    "used":  extension.analyses_used,
-                    "limit": extension.analyses_limit,
-                    "plan":  extension.plan,
-                }
-            )
-
-    # =========================
-    # ANALYSIS
-    # =========================
     try:
         result = analyze_context(text, url)
         result = apply_context_adjustment(result)
 
         score = float(result.get("score", 0))
-
-        _LEVEL_MAP = {
-            "green":  ("green",  "bajo"),
-            "yellow": ("yellow", "medio"),
-            "red":    ("red",    "alto"),
-        }
-
-        adjusted_level      = result.get("level", "yellow")
-        status_color, level = _LEVEL_MAP.get(adjusted_level, ("yellow", "medio"))
-
-        summary    = build_summary(result)
-        insight    = result.get("insight", "")
-        confidence = result.get("confidence", 0.0)
-        context    = result.get("context", "general")
+        adjusted_level = result.get("level", "yellow")
 
     except Exception as e:
-        print("🔥 ERROR EN ANALISIS:", traceback.format_exc())
-
-        score        = 0.0
-        result       = {"score": 0, "signals": []}
-        summary      = f"Error interno: {str(e)}"
-        insight      = ""
-        confidence   = 0.0
-        context      = "general"
-        status_color = "yellow"
-        level        = "medio"
+        print("🔥 ERROR:", traceback.format_exc())
+        result = {"signals": []}
+        score = 0
+        adjusted_level = "yellow"
 
     indicators = [
         {
-            "title":       s,
+            "title": s,
             "explanation": "Señal estructural detectada",
-            "orientation": "alerta" if status_color != "green" else "neutro"
+            "orientation": "alerta"
         }
         for s in result.get("signals", [])[:5]
     ]
 
+    pro_layer = build_pro_layer(
+        signals=result.get("signals", []),
+        commercial_risk=result.get("commercial_risk", {}),
+        score=score
+    )
+
     response_payload = {
         "analysis": {
-            "level":            level,
-            "summary":          summary,
-            "insight":          insight,
-            "confidence":       confidence,
-            "context":          context,
-            "indicators":       indicators,
-            "shown_indicators": len(indicators),
+            "level": adjusted_level,
+            "summary": build_summary(result),
+            "confidence": result.get("confidence", 0),
+            "context": result.get("context", "general"),
+            "indicators": indicators,
             "structural_index": score,
-            "status_color":     status_color,
-            "pro":              result.get("pro", {})
+            "pro": pro_layer
         },
         "meta": {
             "engine_version": ENGINE_VERSION,
-            "analysis_key":   analysis_key,
-            "cached":         False,
-            "plan":           extension.plan,
-            "disclaimer":     "SignalCheck no determina veracidad."
+            "analysis_key": analysis_key,
+            "cached": False,
+            "plan": extension.plan
         }
     }
 
-    # =========================
-    # SAVE
-    # =========================
-    try:
-        analysis_log = AnalysisLog(
-            risk_index       = score,
-            level            = level,
-            engine_version   = ENGINE_VERSION,
-            analysis_key     = analysis_key,
-            response_json    = json.dumps(response_payload)
-        )
+    db.add(AnalysisLog(
+        risk_index=score,
+        level=adjusted_level,
+        engine_version=ENGINE_VERSION,
+        analysis_key=analysis_key,
+        response_json=json.dumps(response_payload)
+    ))
 
-        db.add(analysis_log)
-
-        if extension.plan == "free":
-            extension.analyses_used += 1
-
-        db.commit()
-
-    except Exception as db_error:
-        print("⚠️ ERROR GUARDANDO EN DB:", str(db_error))
+    db.commit()
 
     return response_payload

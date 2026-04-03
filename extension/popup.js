@@ -9,7 +9,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const scoreEl    = document.getElementById("scoreValue");
   const confEl     = document.getElementById("confidenceValue");
 
-  // 🔥 BOTÓN PRO (ROBUSTO)
   const unlockBtn =
     document.getElementById("upgradeBtn") ||
     document.getElementById("unlockBtn")  ||
@@ -123,10 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function renderResult(data) {
 
-    console.log("🔥 RENDER DATA:", JSON.stringify(data, null, 2));
-
     const analysis = data?.analysis || data;
-
     if (!analysis) {
       if (labelBadge) labelBadge.textContent = "Sin datos";
       return;
@@ -136,86 +132,108 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (labelBadge) {
       if (level === "bajo") {
-        labelBadge.textContent      = "🟢 Bajo riesgo";
+        labelBadge.textContent = "🟢 Bajo riesgo";
         labelBadge.style.background = "rgba(34,197,94,0.2)";
-        labelBadge.style.color      = "#4ade80";
+        labelBadge.style.color = "#4ade80";
       } else if (level === "medio") {
-        labelBadge.textContent      = "🟡 Riesgo moderado";
+        labelBadge.textContent = "🟡 Riesgo moderado";
         labelBadge.style.background = "rgba(250,204,21,0.2)";
-        labelBadge.style.color      = "#facc15";
+        labelBadge.style.color = "#facc15";
       } else {
-        labelBadge.textContent      = "🔴 Alto riesgo";
+        labelBadge.textContent = "🔴 Alto riesgo";
         labelBadge.style.background = "rgba(239,68,68,0.2)";
-        labelBadge.style.color      = "#f87171";
+        labelBadge.style.color = "#f87171";
       }
     }
 
     const rawScore = analysis.structural_index;
-
     if (scoreEl && rawScore !== undefined) {
-      const display = rawScore <= 1.0
+      scoreEl.textContent = rawScore <= 1.0
         ? Math.round(rawScore * 100)
         : Math.round(rawScore);
-      scoreEl.textContent = display;
     }
 
     const conf = analysis.confidence;
-
     if (confEl && conf !== undefined) {
-      const display = conf <= 1.0
+      confEl.textContent = conf <= 1.0
         ? Math.round(conf * 100)
         : Math.round(conf);
-      confEl.textContent = display;
     }
 
     if (summaryBox) {
       summaryBox.textContent =
-        analysis.insight  ||
-        analysis.summary  ||
-        analysis.message  ||
+        analysis.insight ||
+        analysis.summary ||
         "Análisis completado.";
-
       summaryBox.classList.remove("hidden");
     }
 
     // ============================
-    // 🔐 CONTROL PRO (NUEVO)
+    // 🔐 CONTROL PLAN
     // ============================
     const plan = data?.meta?.plan || "free";
 
     if (plan === "free") {
 
-      if (proSection) proSection.classList.add("locked");
-      if (unlockBtn) unlockBtn.style.display = "block";
+      if (proSection) {
+        proSection.classList.add("locked");
+
+        proSection.innerHTML = `
+          <div style="margin-top:10px; font-size:12px; color:#aaa;">
+            ⚠️ Hay señales más profundas que no estás viendo<br>
+            Este contenido puede influir en cómo lo interpretás
+          </div>
+        `;
+      }
+
+      if (unlockBtn) {
+        unlockBtn.style.display = "block";
+        unlockBtn.textContent = "Ver qué significa y qué hacer";
+      }
 
     } else {
 
-      if (proSection) proSection.classList.remove("locked");
-      if (unlockBtn) unlockBtn.style.display = "none";
+      if (proSection) {
+        proSection.classList.remove("locked");
 
+        const pro = analysis.pro || {};
+
+        proSection.innerHTML = `
+          <div style="margin-top:10px;">
+            
+            <div style="font-size:13px; font-weight:600; color:#f87171;">
+              ⚠️ ${pro.alert || "Análisis avanzado"}
+            </div>
+
+            <div style="font-size:12px; margin-top:6px; color:#ccc;">
+              ${pro.interpretation || ""}
+            </div>
+
+            <div style="font-size:12px; margin-top:8px; color:#aaa;">
+              <strong>Recomendación:</strong><br>
+              ${pro.action || ""}
+            </div>
+
+            <div style="font-size:11px; margin-top:8px; color:#777;">
+              ${pro.content_profile || ""}
+            </div>
+
+          </div>
+        `;
+      }
+
+      if (unlockBtn) unlockBtn.style.display = "none";
     }
   }
 
-  // ============================
-  // 🚀 BOTÓN PRO
-  // ============================
   if (unlockBtn) {
-
     unlockBtn.addEventListener("click", () => {
-
-      console.log("🚀 Click PRO detectado");
-
       chrome.tabs.create({
         url: "https://gesignalcheck.com/analysis"
       });
-
     });
-
-  } else {
-    console.warn("⚠️ Botón PRO no encontrado (revisar HTML)");
   }
 
-  // AUTO-RUN + BOTÓN
   runAnalysis();
 
   if (analyzeBtn) {
