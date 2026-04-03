@@ -1,6 +1,7 @@
 ## ======================================================
-# SIGNALCHECK – COMMERCIAL RISK v2.1
+# SIGNALCHECK – COMMERCIAL RISK v2.2
 # Detección de riesgo comercial / fraude contextual
+# FIX: is_ecommerce_context multiidioma + detección por URL
 # ======================================================
 
 import re
@@ -31,11 +32,19 @@ HIGH_VALUE_PRODUCTS = [
 ]
 
 LOGIN_PATTERNS = [
+    # español
     "iniciar sesión",
     "registrate",
     "crear cuenta",
     "acceder",
     "ver precios",
+    "ingresar",
+    # inglés
+    "sign in",
+    "log in",
+    "login",
+    "register",
+    "create account",
 ]
 
 PRICE_HIDDEN_PATTERNS = [
@@ -47,6 +56,7 @@ PRICE_HIDDEN_PATTERNS = [
 GENERIC_REVIEWS_PATTERNS = [
     r"\d{3,} reviews",
     r"\d{3,} opiniones",
+    r"\d{1,3},\d{3}\s*(task\s*)?reviews",
     r"\d{1,3},\d{3}",
 ]
 
@@ -56,6 +66,10 @@ LEGAL_PATTERNS = [
     "direccion",
     "términos",
     "condiciones",
+    # inglés
+    "terms",
+    "privacy policy",
+    "legal",
 ]
 
 SUSPICIOUS_TLDS = [
@@ -70,6 +84,26 @@ PAYMENT_PRESSURE_PATTERNS = [
 ]
 
 # ------------------------------------------------------
+# ECOMMERCE DETECTION — multiidioma + URL
+# ------------------------------------------------------
+
+ECOMMERCE_TEXT_SIGNALS = [
+    # español
+    "comprar", "carrito", "oferta", "envío", "precio",
+    "descuento", "tienda", "checkout", "pagar", "agregar al carrito",
+    "agregar", "añadir", "stock", "disponible",
+    # inglés (sitios LATAM con UI en inglés o mixta)
+    "buy now", "shop now", "add to cart", "checkout",
+    "shipping", "price", "discount", "order now", "cart",
+    "buy", "shop", "store",
+]
+
+ECOMMERCE_URL_SIGNALS = [
+    "shop", "store", "tienda", "compra", "cart",
+    "checkout", "product", "oferta", "catalogo",
+]
+
+# ------------------------------------------------------
 # UTIL
 # ------------------------------------------------------
 
@@ -80,9 +114,13 @@ def extract_domain(url: str) -> str:
         return ""
 
 
-def is_ecommerce_context(text: str) -> bool:
+def is_ecommerce_context(text: str, url: str = "") -> bool:
     t = text.lower()
-    return any(w in t for w in ["comprar", "carrito", "oferta", "envío"])
+    u = url.lower()
+    return (
+        any(w in t for w in ECOMMERCE_TEXT_SIGNALS) or
+        any(w in u for w in ECOMMERCE_URL_SIGNALS)
+    )
 
 
 # ------------------------------------------------------
@@ -101,7 +139,7 @@ def analyze_commercial_risk(text: str, url: str = "") -> dict:
     # 1. CONTEXTO
     # --------------------------------------------------
 
-    if not is_ecommerce_context(text):
+    if not is_ecommerce_context(text, url):
         return {
             "level": "none",
             "score": 0,
@@ -175,11 +213,9 @@ def analyze_commercial_risk(text: str, url: str = "") -> dict:
     # 9. NORMALIZACIÓN (ANTI FALSO POSITIVO)
     # --------------------------------------------------
 
-    # Si el dominio es conocido, reducimos riesgo
     if domain and any(k in domain for k in KNOWN_DOMAINS):
         risk_score *= 0.5
 
-    # Limitar score
     risk_score = min(risk_score, 10)
 
     # --------------------------------------------------
