@@ -1,6 +1,6 @@
 # ======================================================
-# SIGNALCHECK ENGINE v13.6 — ESTABILIZACIÓN DE ESCALAS
-# FIX: Falsos positivos en sitios oficiales (Score 19)
+# SIGNALCHECK ENGINE v13.8
+# FIX: Score 0-100, dimensiones context-aware, dominant_pattern por peso
 # ======================================================
 
 import traceback
@@ -158,8 +158,180 @@ def analyze_context(text: str, url: str = "", title: str = ""):
         profile    = build_narrative_profile(adjusted_signals, risk_score)
         insight    = generate_insight(patterns, profile)
 
+        # =========================================================
+        # 9. BLOQUE PRO ESTRUCTURADO — v13.8
+        # =========================================================
+
+        def _pct(v): return round(min(max(v, 0.0), 1.0) * 100)
+
+        def _dim_label(pct):
+            if pct >= 70: return "Alto"
+            if pct >= 40: return "Moderado"
+            if pct >= 15: return "Leve"
+            return "Sin señales"
+
+        def _get_signals(res):
+            if isinstance(res, dict):
+                return res.get("signals", [])
+            return getattr(res, "reasons", [])
+
+        # — Ajuste emocional por contexto —
+        # En noticias la emoción es esperable → la reducimos
+        # En ecommerce la emoción es sospechosa → la amplificamos
+        def _adjust_emocional(raw, ctx):
+            multipliers = {
+                "news":          0.6,   # emoción válida en periodismo
+                "institutional": 0.4,   # emoción rara → muy sospechosa si aparece
+                "ecommerce":     1.4,   # urgencia emocional = presión de compra
+                "social":        1.0,   # neutro
+                "general":       1.0,
+            }
+            m = multipliers.get(ctx, 1.0)
+            return _pct(raw * m)
+
+        # — Dimensiones (5 ejes del radar) —
+        raw_emocional    = (scores["emotions"] + scores["urgency"]) / 2
+        dim_emocional    = _adjust_emocional(raw_emocional, context)
+        dim_narrativo    = _pct((scores["narrative_patterns"] + scores["hypothetical"]) / 2)
+        dim_credibilidad = _pct((scores["credibility"] + scores["contradictions"]) / 2)
+        dim_cientifico   = _pct((scores["scientific_claims"] + scores["promises"]) / 2)
+        dim_comercial    = _pct(comm_data.get("score", 0) / 10)
+
+        dimensions = {
+            "emocional": {
+                "score": dim_emocional,
+                "label": _dim_label(dim_emocional),
+                "signals": list(dict.fromkeys(
+                    _get_signals(emotions) + _get_signals(urgency)
+                ))[:3]
+            },
+            "narrativo": {
+                "score": dim_narrativo,
+                "label": _dim_label(dim_narrativo),
+                "signals": list(dict.fromkeys(
+                    _get_signals(narrative) + _get_signals(hypothetical)
+                ))[:3]
+            },
+            "credibilidad": {
+                "score": dim_credibilidad,
+                "label": _dim_label(dim_credibilidad),
+                "signals": list(dict.fromkeys(
+                    _get_signals(credibility) + _get_signals(contradictions)
+                ))[:3]
+            },
+            "cientifico": {
+                "score": dim_cientifico,
+                "label": _dim_label(dim_cientifico),
+                "signals": list(dict.fromkeys(
+                    _get_signals(scientific) + _get_signals(promises)
+                ))[:3]
+            },
+            "comercial": {
+                "score": dim_comercial,
+                "label": _dim_label(dim_comercial),
+                "signals": comm_data.get("signals", [])[:3]
+            }
+        }
+
+        # — Patrón dominante por impacto real —
+        # Cada patrón tiene un peso implícito según tipo
+        PATTERN_WEIGHTS = {
+            "emotional_manipulation":    0.9,
+            "overpromise":               0.85,
+            "weak_scientific_basis":     0.8,
+            "polarized_narrative":       0.75,
+            "artificial_urgency":        0.7,
+            "clickbait_pattern":         0.65,
+            "weak_authority_claim":      0.6,
+            "unverified_information":    0.55,
+            "low_information_quality":   0.5,
+            "no_pattern":                0.0,
+        }
+
+        if patterns:
+            dominant = max(
+                patterns,
+                key=lambda p: PATTERN_WEIGHTS.get(p.get("type", ""), 0.3)
+            )
+            dominant = {**dominant, "weight": PATTERN_WEIGHTS.get(dominant.get("type",""), 0.3)}
+        else:
+            dominant = {
+                "type": "no_pattern",
+                "label": "Sin patrones críticos detectados",
+                "explanation": "El contenido no presenta estructuras narrativas de riesgo significativas.",
+                "weight": 0.0
+            }
+
+        # — Evidencia textual (frases del contenido) —
+        def _collect_evidence(modules):
+            ev = []
+            for m in modules:
+                if isinstance(m, dict):
+                    ev.extend(m.get("evidence", []))
+                else:
+                    ev.extend(getattr(m, "evidence", []))
+            return list(dict.fromkeys(ev))[:4]
+
+        evidence_list = _collect_evidence([
+            credibility, emotions, urgency, misinformation,
+            scientific, narrative, promises, uncertainty
+        ])
+
+        # — Recomendación accionable —
+        def _build_recommendation(risk_score, patterns, comm_data):
+            comm_level = comm_data.get("level", "none")
+            pattern_types = [p.get("type","") for p in patterns]
+
+            if comm_level == "alto":
+                return {
+                    "action": "no_comprar",
+                    "text": "Este sitio presenta múltiples señales de riesgo comercial. No ingreses datos de pago ni información personal."
+                }
+            if "emotional_manipulation" in pattern_types or "overpromise" in pattern_types:
+                return {
+                    "action": "verificar_fuentes",
+                    "text": "Antes de compartir o actuar, buscá la fuente primaria. El contenido usa recursos emocionales o promesas que pueden distorsionar la percepción."
+                }
+            if "weak_scientific_basis" in pattern_types or "unsupported_scientific_claim" in pattern_types:
+                return {
+                    "action": "consultar_experto",
+                    "text": "Las afirmaciones de salud o ciencia presentes no tienen respaldo verificable. Consultá fuentes académicas o profesionales antes de tomar decisiones."
+                }
+            if "polarized_narrative" in pattern_types:
+                return {
+                    "action": "buscar_otras_perspectivas",
+                    "text": "El contenido presenta una visión polarizada. Buscá otras fuentes con perspectivas distintas antes de formarte una opinión."
+                }
+            if risk_score >= 0.20:
+                return {
+                    "action": "lectura_critica",
+                    "text": "Leé con atención crítica. Algunas señales estructurales sugieren que el contenido puede estar diseñado para influir en tu percepción."
+                }
+            return {
+                "action": "lectura_normal",
+                "text": "No se detectan patrones de riesgo estructural significativos. Podés continuar con lectura normal."
+            }
+
+        recommendation = _build_recommendation(risk_score, patterns, comm_data)
+
+        pro_block = {
+            "dimensions": dimensions,
+            "radar": {
+                "emocional":    dim_emocional,
+                "narrativo":    dim_narrativo,
+                "credibilidad": dim_credibilidad,
+                "cientifico":   dim_cientifico,
+                "comercial":    dim_comercial,
+            },
+            "dominant_pattern": dominant,
+            "evidence":         evidence_list,
+            "recommendation":   recommendation,
+            "insight":          insight,
+            "context_note":     f"Análisis estructural en modo {context}",
+        }
+
         return {
-            "score":       round(risk_score, 2),
+            "score":       int(round(risk_score * 100)),
             "level":       level,
             "message":     message,
             "signals":     adjusted_signals[:6],
@@ -168,12 +340,7 @@ def analyze_context(text: str, url: str = "", title: str = ""):
             "context":     context,
             "source_type": source_info.get("type", "unknown"),
             "commercial_risk": comm_data,
-            "pro": {
-                "patterns": patterns,
-                "narrative_profile": profile,
-                "context_note": f"Análisis en modo {context}",
-                "_scores": scores
-            }
+            "pro": pro_block
         }
 
     except Exception as e:

@@ -1,4 +1,4 @@
-print("APP FILE ACTUAL 14.2 - COHERENCE FIX + PRO IMPROVED")
+print("APP FILE ACTUAL 14.3 - PRO FROM ENGINE + SCORE 0-100")
 
 import os
 import json
@@ -23,65 +23,7 @@ from backend.utils.content_versioning import (
     build_analysis_key,
 )
 
-ENGINE_VERSION = "v14.2"
-
-app = FastAPI(title="GE SignalCheck API — v14.2")
-
-# =========================
-# 🔥 PRO LAYER MEJORADO
-# =========================
-def build_pro_layer(signals, commercial_risk, score):
-
-    text = " ".join(signals).lower()
-
-    # 🧨 ALERTA
-    if commercial_risk.get("level") == "alto":
-        alert = "Patrón típico de riesgo comercial detectado"
-    elif score >= 0.55:
-        alert = "Alta presión narrativa detectada"
-    elif score >= 0.25:
-        alert = "Señales mixtas detectadas"
-    else:
-        alert = "Contenido estructuralmente estable"
-
-    # 🧠 INTERPRETACIÓN (DINÁMICA)
-    if "urgency" in text:
-        interpretation = "Se detecta presión para generar decisiones rápidas."
-    elif "emotion" in text:
-        interpretation = "El contenido busca generar una reacción emocional."
-    elif "polarization" in text:
-        interpretation = "Se presenta un enfoque polarizado del mensaje."
-    elif "misinformation" in text:
-        interpretation = "Se detectan posibles inconsistencias o falta de respaldo."
-    elif "commercial" in text:
-        interpretation = "Patrón típico de contenido comercial con riesgo."
-    else:
-        interpretation = "Estructura informativa sin señales críticas fuertes."
-
-    # 🎯 ACCIÓN
-    if commercial_risk.get("level") in ["medio", "alto"]:
-        action = "Evitar pagos o decisiones sin verificar la fuente."
-    elif score >= 0.5:
-        action = "Tomar distancia y verificar antes de actuar."
-    else:
-        action = "Consumir con criterio crítico."
-
-    # 🧩 PERFIL
-    if commercial_risk.get("level") == "alto":
-        profile = "Contenido comercial de alto riesgo"
-    elif score >= 0.55:
-        profile = "Contenido con presión narrativa"
-    elif score >= 0.25:
-        profile = "Contenido mixto"
-    else:
-        profile = "Contenido informativo estable"
-
-    return {
-        "alert": alert,
-        "interpretation": interpretation,
-        "action": action,
-        "content_profile": profile
-    }
+ENGINE_VERSION = "v14.3"
 
 # =========================
 # RATE LIMIT
@@ -155,40 +97,46 @@ async def verify(
         signals = []
 
     # =========================
-    # 🔥 NORMALIZACIÓN CLAVE
+    # NORMALIZACIÓN
+    # engine v13.8 devuelve score como float 0-1
+    # app lo convierte a entero 0-100 y normaliza level
     # =========================
+    score_int = int(round(score * 100)) if score <= 1.0 else int(score)
+
     if score < 0.20:
-        level = "bajo"
+        level   = "green"
         summary = "El contenido no presenta patrones estructurales de riesgo."
     elif score < 0.55:
-        level = "medio"
+        level   = "yellow"
         summary = "El contenido requiere lectura crítica."
     else:
-        level = "alto"
+        level   = "red"
         summary = "Se detecta presión narrativa significativa."
 
     indicators = [{"title": s} for s in signals[:5]]
 
-    pro = build_pro_layer(
-        signals=signals,
-        commercial_risk=result.get("commercial_risk", {}),
-        score=score
-    )
+    # PRO viene del engine — rico y estructurado
+    pro = result.get("pro", {})
 
     response = {
         "analysis": {
-            "level": level,
-            "summary": summary,
-            "confidence": result.get("confidence", 0),
-            "context": result.get("context", "general"),
-            "indicators": indicators,
-            "structural_index": score,
-            "pro": pro
+            "level":            level,
+            "summary":          summary,
+            "message":          result.get("message", summary),
+            "insight":          result.get("insight", ""),
+            "score":            score_int,
+            "confidence":       result.get("confidence", 0),
+            "context":          result.get("context", "general"),
+            "source_type":      result.get("source_type", "unknown"),
+            "signals":          signals[:6],
+            "indicators":       indicators,
+            "commercial_risk":  result.get("commercial_risk", {}),
+            "pro":              pro,
         },
         "meta": {
             "engine_version": ENGINE_VERSION,
-            "analysis_key": analysis_key,
-            "plan": "free"
+            "analysis_key":   analysis_key,
+            "plan":           "free"
         }
     }
 
