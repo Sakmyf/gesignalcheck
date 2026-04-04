@@ -8,8 +8,8 @@
 <body>
   <div class="container">
 
-    <!-- SCAN -->
-    <div id="scanLine" class="scan-line"></div>
+    <!-- SCAN LINE -->
+    <div id="scanLine" class="loader"></div>
 
     <!-- HEADER -->
     <div class="header">
@@ -17,7 +17,7 @@
       <div class="subtitle">Análisis estructural del contenido</div>
     </div>
 
-    <!-- RESULTADO -->
+    <!-- BADGE NIVEL -->
     <div id="labelBadge" class="signal-label">Iniciando...</div>
 
     <!-- SCORE -->
@@ -26,7 +26,6 @@
         <span id="scoreValue">--</span>
         <span class="score-label">/100</span>
       </div>
-
       <div class="confidence">
         Confianza: <span id="confidenceValue">--</span>%
       </div>
@@ -35,34 +34,47 @@
     <!-- INSIGHT -->
     <div id="summary" class="hidden insight-box"></div>
 
+    <!-- PRO WARNING (freemium hook) -->
+    <div id="proWarning" class="pro-warning hidden"></div>
+
     <!-- 🔒 PRO SECTION -->
     <div class="pro-section locked" id="proSection">
 
       <div class="pro-title">🔍 Análisis avanzado</div>
 
       <ul class="pro-list">
-        <li>Emocionalidad: <span id="pro-emocionalidad">🔒</span></li>
-        <li>Manipulación: <span id="pro-manipulacion">🔒</span></li>
-        <li>Evidencia: <span id="pro-evidencia">🔒</span></li>
-        <li>Coherencia: <span id="pro-coherencia">🔒</span></li>
+        <li>Emocional: <span id="pro-emocional">🔒</span></li>
+        <li>Narrativo: <span id="pro-narrativo">🔒</span></li>
+        <li>Credibilidad: <span id="pro-credibilidad">🔒</span></li>
+        <li>Científico: <span id="pro-cientifico">🔒</span></li>
+        <li>Comercial: <span id="pro-comercial">🔒</span></li>
       </ul>
+
+      <div class="pro-pattern-box">
+        <div class="pro-label-small">Patrón dominante</div>
+        <div id="pro-pattern">🔒</div>
+      </div>
+
+      <div class="pro-rec-box">
+        <div class="pro-label-small">Recomendación</div>
+        <div id="pro-recommendation">🔒</div>
+      </div>
 
       <!-- BOTÓN UPGRADE -->
       <button id="upgradeBtn" class="upgrade-btn">
         Desbloquear análisis completo
       </button>
 
-      <!-- 🔥 ACTIVACIÓN PRO -->
+      <!-- ACTIVACIÓN PRO -->
       <div style="margin-top:10px; display:flex; gap:5px;">
-        <input 
+        <input
           id="proTokenInput"
           placeholder="Código PRO"
-          style="flex:1; padding:6px; border-radius:6px; border:none; background:#111; color:#fff;"
+          style="flex:1; padding:6px; border-radius:6px; border:none; background:#111; color:#fff; font-size:12px;"
         />
-
-        <button 
+        <button
           id="activateProBtn"
-          style="padding:6px 10px; border-radius:6px; border:none; background:#16a34a; color:white; font-weight:bold; cursor:pointer;"
+          style="padding:6px 10px; border-radius:6px; border:none; background:#16a34a; color:white; font-weight:bold; cursor:pointer; font-size:12px;"
         >
           Activar
         </button>
@@ -75,13 +87,13 @@
 
     <!-- BOTÓN ANALIZAR -->
     <button id="analyzeBtn"
-      style="margin-top: 10px; width: 100%; padding: 10px; border-radius: 8px; border: none; background: #1e293b; color: white; cursor: pointer; font-weight: bold;">
+      style="margin-top:10px; width:100%; padding:10px; border-radius:8px; border:none;
+             background:#1e293b; color:white; cursor:pointer; font-weight:bold; font-size:13px;">
       Re-analizar página
     </button>
 
   </div>
 
   <script src="popup.js"></script>
-
 </body>
 </html>
