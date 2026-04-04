@@ -25,6 +25,8 @@ from backend.utils.content_versioning import (
 
 ENGINE_VERSION = "v14.3"
 
+app = FastAPI(title="GE SignalCheck API — v14.3")
+
 # =========================
 # RATE LIMIT
 # =========================
