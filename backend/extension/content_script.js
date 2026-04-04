@@ -136,33 +136,28 @@ if (!window.__SignalCheckInjected__) {
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     if (!request || request.action !== "extractText") {
-      return;
+      return false;
     }
 
+    // Respuesta síncrona — no necesita return true
     try {
-
       const cleanText = extractCleanText();
-
       sendResponse({
         text: cleanText,
         url: window.location.href,
         title: document.title || ""
       });
-
     } catch (error) {
-
       console.error("❌ Error extrayendo texto:", error);
-
       sendResponse({
         text: "",
         url: window.location.href,
         title: document.title || "",
         error: true
       });
-
     }
 
-    return true;
+    return false; // respuesta ya enviada de forma síncrona
 
   });
 
