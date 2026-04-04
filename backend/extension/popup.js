@@ -162,6 +162,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const analysis = data?.analysis || data;
     if (!analysis) return showError("Sin datos.");
 
+    console.log("🔍 renderResult score:", analysis.score, "level:", analysis.level);
+
     const plan = data?.meta?.plan || "free";
 
     // — Badge nivel —
