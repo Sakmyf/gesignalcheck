@@ -80,6 +80,26 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ANÁLISIS
   // =====================
 
+  // Envía mensaje al content script con retry automático
+  function sendExtractMessage(tabId, attempts = 3) {
+    return new Promise((resolve) => {
+      function attempt(n) {
+        chrome.tabs.sendMessage(tabId, { action: "extractText" }, (res) => {
+          if (chrome.runtime.lastError || !res) {
+            if (n > 1) {
+              setTimeout(() => attempt(n - 1), 300);
+            } else {
+              resolve(null);
+            }
+          } else {
+            resolve(res);
+          }
+        });
+      }
+      attempt(attempts);
+    });
+  }
+
   async function runAnalysis() {
     startScanUI();
 
@@ -90,6 +110,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         return showError("Página no compatible.");
       }
 
+      // Inyectar content script (si ya está inyectado, falla silenciosamente)
       try {
         await chrome.scripting.executeScript({
           target: { tabId: tab.id },
@@ -97,35 +118,34 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
       } catch {}
 
-      await new Promise(r => setTimeout(r, 150));
+      // Esperar y reintentar hasta 3 veces
+      await new Promise(r => setTimeout(r, 200));
+      const extracted = await sendExtractMessage(tab.id, 3);
 
-      chrome.tabs.sendMessage(tab.id, { action: "extractText" }, async (extracted) => {
+      if (!extracted) return showError("No se pudo leer la página.");
 
-        if (!extracted) return showError("No se pudo leer la página.");
+      const text = extracted.text || "";
+      if (text.length < 30) return showError("Texto insuficiente.");
 
-        const text = extracted.text || "";
-        if (text.length < 30) return showError("Texto insuficiente.");
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-extension-id": chrome.runtime.id,
+            "x-pro-token": storedToken || ""
+          },
+          body: JSON.stringify({ text, url: extracted.url || tab.url })
+        });
 
-        try {
-          const res = await fetch(API_URL, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-extension-id": chrome.runtime.id,
-              "x-pro-token": storedToken || ""
-            },
-            body: JSON.stringify({ text, url: extracted.url || tab.url })
-          });
+        if (!res.ok) return showError("Error servidor.");
 
-          if (!res.ok) return showError("Error servidor.");
+        const data = await res.json();
+        renderResult(data);
 
-          const data = await res.json();
-          renderResult(data);
-
-        } catch {
-          showError("Error de conexión.");
-        }
-      });
+      } catch {
+        showError("Error de conexión.");
+      }
 
     } catch {
       showError("Error inesperado.");
