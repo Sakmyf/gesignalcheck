@@ -20,7 +20,7 @@ KNOWN_DOMAINS = [
     "carrefour",
     "coto",
     "vecompras",
-    "tececompras",
+    "tevecompras",
 ]
 
 HIGH_VALUE_PRODUCTS = [
