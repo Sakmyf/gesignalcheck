@@ -1,4 +1,4 @@
-print("APP FILE ACTUAL 14.5 - FIX SCORE REAL CALIBRATION")
+print("APP FILE ACTUAL 14.6 - CONTEXT FIX REAL")
 
 import os
 import json
@@ -23,9 +23,9 @@ from backend.utils.content_versioning import (
     build_analysis_key,
 )
 
-ENGINE_VERSION = "v14.5"
+ENGINE_VERSION = "v14.6"
 
-app = FastAPI(title="GE SignalCheck API — v14.5")
+app = FastAPI(title="GE SignalCheck API — v14.6")
 
 # =========================
 # RATE LIMIT
@@ -94,6 +94,8 @@ async def verify(
         score = float(result.get("score", 0))
         signals = result.get("signals", [])
 
+        text_lower = text.lower()
+
         # =========================
         # 🔥 AJUSTE POR FUENTE
         # =========================
@@ -102,7 +104,8 @@ async def verify(
             "indec.gob.ar",
             "vatican.va",
             "bbc.com",
-            "reuters.com"
+            "reuters.com",
+            "cnn.com"
         ]
 
         low_trust_sources = [
@@ -113,7 +116,7 @@ async def verify(
         ]
 
         if any(domain in url for domain in trusted_sources):
-            score *= 0.3
+            score *= 0.4
 
         elif any(domain in url for domain in low_trust_sources):
             score *= 1.4
@@ -129,7 +132,7 @@ async def verify(
             "impactante"
         ]
 
-        if any(p in text.lower() for p in sensational_patterns):
+        if any(p in text_lower for p in sensational_patterns):
             score += 0.25
 
         # =========================
@@ -140,8 +143,38 @@ async def verify(
             "datos", "informe", "relevamiento"
         ]
 
-        if any(k in text.lower() for k in technical_keywords):
+        if any(k in text_lower for k in technical_keywords):
             score *= 0.5
+
+        # =========================
+        # 🔥 CONTEXTO PERIODÍSTICO (FIX CLAVE)
+        # =========================
+        journalistic_patterns = [
+            "según",
+            "reportó",
+            "de acuerdo a",
+            "fuentes",
+            "informó",
+            "explicó",
+            "indicó"
+        ]
+
+        if any(p in text_lower for p in journalistic_patterns):
+            score *= 0.6
+
+        # =========================
+        # 🔥 FACT CHECK (FIX CLAVE)
+        # =========================
+        factcheck_patterns = [
+            "no es cierto",
+            "es falso",
+            "desmentido",
+            "verificación",
+            "fact-check"
+        ]
+
+        if any(p in text_lower for p in factcheck_patterns):
+            score *= 0.3
 
         # =========================
         # 🔥 CLAMP FINAL
@@ -149,6 +182,7 @@ async def verify(
         score = max(0, min(score, 1))
 
     except Exception:
+        traceback.print_exc()
         score = 0
         signals = []
 
