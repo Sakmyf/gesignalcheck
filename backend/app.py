@@ -1,4 +1,4 @@
-print("APP FILE ACTUAL 14.4 - FIX SCORE + LEVEL COMPAT")
+print("APP FILE ACTUAL 14.5 - FIX SCORE REAL CALIBRATION")
 
 import os
 import json
@@ -23,9 +23,9 @@ from backend.utils.content_versioning import (
     build_analysis_key,
 )
 
-ENGINE_VERSION = "v14.4"
+ENGINE_VERSION = "v14.5"
 
-app = FastAPI(title="GE SignalCheck API — v14.4")
+app = FastAPI(title="GE SignalCheck API — v14.5")
 
 # =========================
 # RATE LIMIT
@@ -94,6 +94,60 @@ async def verify(
         score = float(result.get("score", 0))
         signals = result.get("signals", [])
 
+        # =========================
+        # 🔥 AJUSTE POR FUENTE
+        # =========================
+        trusted_sources = [
+            "nytimes.com",
+            "indec.gob.ar",
+            "vatican.va",
+            "bbc.com",
+            "reuters.com"
+        ]
+
+        low_trust_sources = [
+            "facebook.com",
+            "tiktok.com",
+            "blogspot.com",
+            "escupetudessarrollo.com"
+        ]
+
+        if any(domain in url for domain in trusted_sources):
+            score *= 0.3
+
+        elif any(domain in url for domain in low_trust_sources):
+            score *= 1.4
+
+        # =========================
+        # 🔥 SENSACIONALISMO
+        # =========================
+        sensational_patterns = [
+            "último momento",
+            "no vas a creer",
+            "pánico",
+            "urgente",
+            "impactante"
+        ]
+
+        if any(p in text.lower() for p in sensational_patterns):
+            score += 0.25
+
+        # =========================
+        # 🔥 CONTENIDO TÉCNICO
+        # =========================
+        technical_keywords = [
+            "índice", "metodología", "estadística",
+            "datos", "informe", "relevamiento"
+        ]
+
+        if any(k in text.lower() for k in technical_keywords):
+            score *= 0.5
+
+        # =========================
+        # 🔥 CLAMP FINAL
+        # =========================
+        score = max(0, min(score, 1))
+
     except Exception:
         score = 0
         signals = []
@@ -104,7 +158,7 @@ async def verify(
     score_int = int(round(score * 100)) if score <= 1.0 else int(score)
 
     # =========================
-    # NORMALIZACIÓN LEVEL (FIX)
+    # NORMALIZACIÓN LEVEL
     # =========================
     if score < 0.20:
         level   = "bajo"
@@ -118,9 +172,6 @@ async def verify(
 
     indicators = [{"title": s} for s in signals[:5]]
 
-    # =========================
-    # PRO
-    # =========================
     pro = result.get("pro", {})
 
     response = {
@@ -129,8 +180,7 @@ async def verify(
             "summary":          summary,
             "message":          result.get("message", summary),
             "insight":          result.get("insight", ""),
-            
-            # 🔥 FIX CLAVE
+
             "score":            score_int,
             "structural_index": score_int,
 
