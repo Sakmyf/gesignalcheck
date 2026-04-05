@@ -1,193 +1,50 @@
-const API_URL = "https://gesignalcheck-production-8e78.up.railway.app/v3/verify";
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>SignalCheck</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
 
-document.addEventListener("DOMContentLoaded", () => {
+<body>
 
-  const analyzeBtn = document.getElementById("analyzeBtn");
-  const scanLine   = document.getElementById("scanLine");
-  const labelBadge = document.getElementById("labelBadge");
-  const summaryBox = document.getElementById("summary");
-  const scoreEl    = document.getElementById("scoreValue");
-  const confEl     = document.getElementById("confidenceValue");
+  <div class="container">
 
-  const upgradeBtn = document.getElementById("upgradeBtn");
-  const proSection = document.getElementById("proSection");
-  const proWarning = document.getElementById("proWarning");
+    <h1>SignalCheck</h1>
+    <p class="subtitle">Análisis estructural del contenido</p>
 
-  function startScanUI() {
-    if (scanLine) scanLine.classList.add("active");
+    <div id="labelBadge" class="badge">Analizando...</div>
 
-    labelBadge.textContent = "Analizando contenido...";
-    labelBadge.style.background = "#333";
-    labelBadge.style.color = "#aaa";
+    <div class="score">
+      <span id="scoreValue">--</span> /100
+    </div>
 
-    summaryBox.classList.add("hidden");
-    scoreEl.textContent = "--";
-    confEl.textContent = "--";
-  }
+    <div class="confidence">
+      Confianza: <span id="confidenceValue">--</span>%
+    </div>
 
-  function stopScanUI() {
-    if (scanLine) scanLine.classList.remove("active");
-  }
+    <div id="summary" class="summary hidden"></div>
 
-  async function runAnalysis() {
+    <!-- 🔐 PRO -->
+    <div id="proSection" class="pro locked">
 
-    const MIN_TIME  = 2000;
-    const startTime = Date.now();
+      <div id="proWarning" class="warning">
+        ⚠ Hay señales más profundas que no estás viendo
+      </div>
 
-    startScanUI();
+      <button id="upgradeBtn" class="upgrade-btn">
+        🔓 Ver análisis completo
+      </button>
 
-    try {
+    </div>
 
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    <button id="analyzeBtn" class="analyze-btn">
+      Re-analizar página
+    </button>
 
-      if (!tab?.id || tab.url.startsWith("chrome://")) {
-        labelBadge.textContent = "Página no compatible";
-        stopScanUI();
-        return;
-      }
+  </div>
 
-      try {
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          files: ["content_script.js"]
-        });
-      } catch {}
+  <script src="popup.js"></script>
 
-      await new Promise(r => setTimeout(r, 150));
-
-      chrome.tabs.sendMessage(tab.id, { action: "extractText" }, async (extracted) => {
-
-        if (!extracted) {
-          labelBadge.textContent = "Error leyendo página";
-          stopScanUI();
-          return;
-        }
-
-        const text = extracted.text || "";
-        if (text.length < 30) {
-          labelBadge.textContent = "Texto insuficiente";
-          stopScanUI();
-          return;
-        }
-
-        try {
-
-          const res = await fetch(API_URL, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-extension-id": chrome.runtime.id
-            },
-            body: JSON.stringify({
-              text,
-              url: extracted.url || tab.url
-            })
-          });
-
-          const data = await res.json();
-
-          const wait = Math.max(0, MIN_TIME - (Date.now() - startTime));
-
-          setTimeout(() => {
-            renderResult(data);
-            stopScanUI();
-          }, wait);
-
-        } catch {
-          labelBadge.textContent = "Error de conexión";
-          stopScanUI();
-        }
-
-      });
-
-    } catch {
-      labelBadge.textContent = "Error inesperado";
-      stopScanUI();
-    }
-  }
-
-  function renderResult(data) {
-
-    const analysis = data?.analysis || data;
-    if (!analysis) return;
-
-    let level = (analysis.level || "medio").toLowerCase();
-    const score = analysis.structural_index ?? 0;
-
-    // 🔥 FIX CRÍTICO: coherencia score ↔ nivel
-    if (score <= 20) level = "bajo";
-    else if (score <= 50) level = "medio";
-    else level = "alto";
-
-    // UI badge
-    if (level === "bajo") {
-      labelBadge.textContent = "🟢 Bajo riesgo";
-      labelBadge.style.background = "rgba(34,197,94,0.2)";
-      labelBadge.style.color = "#4ade80";
-    } else if (level === "medio") {
-      labelBadge.textContent = "🟡 Riesgo moderado";
-      labelBadge.style.background = "rgba(250,204,21,0.2)";
-      labelBadge.style.color = "#facc15";
-    } else {
-      labelBadge.textContent = "🔴 Alto riesgo";
-      labelBadge.style.background = "rgba(239,68,68,0.2)";
-      labelBadge.style.color = "#f87171";
-    }
-
-    // Score
-    scoreEl.textContent = score <= 1 ? Math.round(score * 100) : Math.round(score);
-
-    // Confianza
-    const conf = analysis.confidence ?? 0;
-    confEl.textContent = conf <= 1 ? Math.round(conf * 100) : Math.round(conf);
-
-    // 🔥 FIX CRÍTICO: coherencia del mensaje
-    if (analysis.insight) {
-      summaryBox.textContent = analysis.insight;
-    } else {
-      if (level === "alto") {
-        summaryBox.textContent = "Se detectan señales estructurales que pueden influir en la interpretación del contenido.";
-      } else if (level === "medio") {
-        summaryBox.textContent = "Se observan algunos patrones que pueden afectar la percepción del contenido.";
-      } else {
-        summaryBox.textContent = "El contenido no presenta señales relevantes de manipulación estructural.";
-      }
-    }
-
-    summaryBox.classList.remove("hidden");
-
-    const plan = data?.meta?.plan || "free";
-
-    // 🔐 CONTROL PRO (se mantiene igual)
-    if (plan === "free") {
-
-      proSection.classList.add("locked");
-
-      if (proWarning) proWarning.style.display = "block";
-      if (upgradeBtn) upgradeBtn.style.display = "block";
-
-    } else {
-
-      proSection.classList.remove("locked");
-
-      if (proWarning) proWarning.style.display = "none";
-      if (upgradeBtn) upgradeBtn.style.display = "none";
-
-    }
-  }
-
-  if (upgradeBtn) {
-    upgradeBtn.addEventListener("click", () => {
-      chrome.tabs.create({
-        url: "https://gesignalcheck.com/analysis"
-      });
-    });
-  }
-
-  runAnalysis();
-
-  if (analyzeBtn) {
-    analyzeBtn.addEventListener("click", runAnalysis);
-  }
-
-});
+</body>
+</html>
