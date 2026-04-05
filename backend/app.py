@@ -1,22 +1,28 @@
-# ======================================================
-# SIGNALCHECK BACKEND – STABLE FINAL (ENGINE COMPATIBLE)
-# ======================================================
-
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import hashlib
-import time
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
-# =========================
-# IMPORT DEL ENGINE REAL
-# =========================
-from backend.engine import analyze  # 🔥 FIX IMPORT
+import hashlib
+
+# 🔥 IMPORT CORRECTO (ADAPTADO A TU ENGINE)
+from backend.engine import analyze_context
 
 app = FastAPI()
 
 # =========================
-# CORS (SIMPLE PROD)
+# RATE LIMIT
+# =========================
+limiter = Limiter(key_func=get_remote_address)
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, lambda r, e: HTTPException(429, "Rate limit exceeded"))
+app.add_middleware(SlowAPIMiddleware)
+
+# =========================
+# CORS
 # =========================
 app.add_middleware(
     CORSMiddleware,
@@ -27,143 +33,88 @@ app.add_middleware(
 )
 
 # =========================
-# REQUEST MODEL
+# HELPERS
 # =========================
-class AnalyzeRequest(BaseModel):
-    url: str
-    content: str
 
-# =========================
-# HASH DETERMINÍSTICO
-# =========================
-def generate_analysis_key(url: str, content: str) -> str:
-    raw = f"{url}|{hashlib.sha256(content.encode()).hexdigest()}|v13"
-    return hashlib.sha256(raw.encode()).hexdigest()
+def normalize_engine_output(result: dict):
 
-# =========================
-# CONTEXT OVERRIDE
-# =========================
-def apply_context_override(score: float, url: str) -> float:
+    score = result.get("score", 0)
+    confidence = result.get("confidence", 0.5)
 
-    url = url.lower()
+    # 🔥 FIX: evitar 0 absoluto
+    if confidence == 0:
+        confidence = 0.45
 
-    institutional_domains = [
-        "gob.ar",
-        "argentina.gob.ar",
-        "indec.gob.ar",
-        "casarosada.gob.ar",
-        "usa.gov",
-        ".gov",
-        ".edu"
-    ]
+    # normalizar score a 0-1
+    score_norm = max(0, min(score / 100, 1))
 
-    factcheck_domains = [
-        "maldita.es",
-        "chequeado.com",
-        "factcheck.org"
-    ]
+    return score_norm, confidence
 
-    if any(domain in url for domain in institutional_domains):
-        return min(score, 0.15)
 
-    if any(domain in url for domain in factcheck_domains):
-        return min(score, 0.20)
+def get_level(score: float):
 
-    return score
-
-# =========================
-# SCORE → NIVEL
-# =========================
-def get_level(score: float) -> str:
-    if score < 0.3:
+    if score <= 0.2:
         return "bajo"
-    elif score < 0.6:
+    elif score <= 0.6:
         return "moderado"
     else:
         return "alto"
 
-# =========================
-# MENSAJE UX COHERENTE
-# =========================
-def get_message(score: float) -> str:
-
-    if score < 0.3:
-        return "El contenido no presenta señales relevantes de manipulación o riesgo."
-
-    elif score < 0.6:
-        return "Se detectan ciertos patrones que requieren una lectura más atenta."
-
-    else:
-        return "Se detectan múltiples señales asociadas a contenido potencialmente problemático."
-
-# =========================
-# NORMALIZADOR ENGINE (CLAVE)
-# =========================
-def normalize_engine_output(result: dict):
-
-    # fallback seguro
-    score = result.get("score", 0.0)
-    confidence = result.get("confidence", 0.5)
-
-    # por si viene en otro formato
-    if score > 1:
-        score = score / 100
-
-    if confidence > 1:
-        confidence = confidence / 100
-
-    return score, confidence
 
 # =========================
 # ENDPOINT PRINCIPAL
 # =========================
+
 @app.post("/v3/verify")
-async def verify(data: AnalyzeRequest, request: Request):
+@limiter.limit("30/minute")
+async def verify(request: Request):
 
-    if not data.url or not data.content:
-        raise HTTPException(status_code=400, detail="Faltan datos")
+    data = await request.json()
 
-    # =========================
-    # HASH
-    # =========================
-    analysis_key = generate_analysis_key(data.url, data.content)
+    text = data.get("text", "")
+    url = data.get("url", "")
+    title = data.get("title", "")
 
-    # =========================
-    # MOTOR
-    # =========================
-    base_result = analyze(data.content)
-
-    score, confidence = normalize_engine_output(base_result)
+    if not text:
+        raise HTTPException(status_code=400, detail="No text provided")
 
     # =========================
-    # 🔥 CONTEXT FIX
+    # ANALYSIS KEY (determinístico)
     # =========================
-    score = apply_context_override(score, data.url)
-
-    # Clamp final
-    score = max(0.0, min(score, 1.0))
-    confidence = max(0.0, min(confidence, 1.0))
+    raw_key = f"{url}|{text[:500]}"
+    analysis_key = hashlib.sha256(raw_key.encode()).hexdigest()
 
     # =========================
-    # OUTPUT
+    # ENGINE CALL
     # =========================
-    level = get_level(score)
-    message = get_message(score)
+    result = analyze_context(text, url, title)
 
+    # =========================
+    # NORMALIZACIÓN
+    # =========================
+    score_norm, confidence = normalize_engine_output(result)
+
+    # =========================
+    # NIVEL FINAL
+    # =========================
+    level = get_level(score_norm)
+
+    # 🔥 FIX CRÍTICO
+    if score_norm == 0:
+        level = "bajo"
+
+    # =========================
+    # RESPONSE
+    # =========================
     return {
         "analysis_key": analysis_key,
-        "url": data.url,
-        "score": int(score * 100),
+        "score": int(score_norm * 100),
         "level": level,
-        "confidence": int(confidence * 100),
-        "message": message,
-        "timestamp": int(time.time()),
-        "engine_version": "v13-context-stable"
+        "confidence": round(confidence * 100),
+        "message": result.get("message", ""),
+        "signals": result.get("signals", []),
+        "insight": result.get("insight", ""),
+        "context": result.get("context", ""),
+        "source_type": result.get("source_type", ""),
+        "pro": result.get("pro", {})
     }
-
-# =========================
-# HEALTH CHECK
-# =========================
-@app.get("/")
-def root():
-    return {"status": "SignalCheck backend operativo"}
