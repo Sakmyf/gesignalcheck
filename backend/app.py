@@ -1,5 +1,5 @@
 # ======================================================
-# SIGNALCHECK API – APP.PY (ESTABLE + FIX SCORE + UX)
+# SIGNALCHECK API – APP.PY (FIX ENGINE INTEGRATION)
 # ======================================================
 
 from fastapi import FastAPI, Request, HTTPException
@@ -8,18 +8,18 @@ from pydantic import BaseModel
 import hashlib
 import time
 
-# 🔥 IMPORT ENGINE (ajustalo a tu path real si cambia)
-from backend.engine import analyze_text
+# 🔥 IMPORT REAL (CORRECTO)
+from backend.engine import analyze_context
 
 app = FastAPI()
 
 # ======================================================
-# 🌐 CORS (AJUSTAR EN PRODUCCIÓN)
+# 🌐 CORS
 # ======================================================
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 🔒 luego limitar
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,104 +44,70 @@ def generate_analysis_key(url: str, text: str) -> str:
     return hashlib.sha256(base.encode()).hexdigest()
 
 
-def calculate_level(score_norm: float) -> str:
-    if score_norm >= 0.7:
+def map_level(engine_level: str) -> str:
+    # engine usa: red / yellow / green
+    if engine_level == "red":
         return "alto"
-    elif score_norm >= 0.3:
+    elif engine_level == "yellow":
         return "moderado"
-    else:
-        return "bajo"
-
-
-def build_message(level: str) -> str:
-    if level == "alto":
-        return "Se detectan múltiples señales de riesgo estructural."
-    elif level == "moderado":
-        return "Señales mixtas — lectura crítica recomendada."
-    else:
-        return "Bajo riesgo estructural detectado."
-
-
-def calculate_confidence(result: dict) -> int:
-    # 🔥 heurística simple (después la refinamos)
-    signals = len(result.get("reasons", []))
-    base = 30 + signals * 10
-    return max(10, min(base, 95))
+    return "bajo"
 
 
 # ======================================================
-# 🚀 ENDPOINT PRINCIPAL
+# 🚀 ENDPOINT
 # ======================================================
 
 @app.post("/v3/verify")
 async def verify(req: VerifyRequest, request: Request):
 
-    # 🔐 HEADER VALIDATION
     extension_id = request.headers.get("x-extension-id")
 
     if not extension_id:
         raise HTTPException(status_code=401, detail="Extensión no autorizada")
 
-    # 🧠 GENERAR KEY DETERMINÍSTICA
+    # 🔑 KEY
     analysis_key = generate_analysis_key(req.url, req.text)
 
     # ==================================================
-    # 🧠 ENGINE
+    # 🧠 ENGINE (USO CORRECTO)
     # ==================================================
 
     try:
-        result = analyze_text(req.text)
+        result = analyze_context(req.text, req.url)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+    # ==================================================
+    # 🎯 DATOS DEL ENGINE
+    # ==================================================
+
     raw_score = result.get("score", 0)
+    engine_level = result.get("level", "green")
+
+    level = map_level(engine_level)
+
+    # 🔥 YA VIENE EN 0–100 → NO TOCAR
+    score_visual = int(raw_score)
+
+    confidence = int(result.get("confidence", 0))
+
+    message = result.get("message", "")
 
     # ==================================================
-    # 🔥 FIX DE ESCALA (CLAVE)
+    # 📦 RESPONSE FINAL
     # ==================================================
 
-    if raw_score <= 5:
-        score_norm = raw_score / 20
-    else:
-        score_norm = raw_score / 100
-
-    score_norm = max(0, min(score_norm, 1))
-
-    # ==================================================
-    # 🎯 NIVEL + MENSAJE
-    # ==================================================
-
-    level = calculate_level(score_norm)
-    message = build_message(level)
-
-    # ==================================================
-    # 📊 SCORE FINAL (0–100 VISUAL)
-    # ==================================================
-
-    score_visual = int(score_norm * 100)
-
-    # ==================================================
-    # 🧠 CONFIANZA
-    # ==================================================
-
-    confidence = calculate_confidence(result)
-
-    # ==================================================
-    # 📦 RESPONSE
-    # ==================================================
-
-    response = {
+    return {
         "analysis_key": analysis_key,
         "url": req.url,
         "level": level,
         "score": score_visual,
         "confidence": confidence,
         "message": message,
-        "details": result.get("reasons", []),
+        "details": result.get("signals", []),
+        "pro": result.get("pro", {}),
         "timestamp": int(time.time())
     }
-
-    return response
 
 
 # ======================================================
