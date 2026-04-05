@@ -1,120 +1,153 @@
+# ======================================================
+# SIGNALCHECK API – APP.PY (ESTABLE + FIX SCORE + UX)
+# ======================================================
+
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
-
+from pydantic import BaseModel
 import hashlib
+import time
 
-# 🔥 IMPORT CORRECTO (ADAPTADO A TU ENGINE)
-from backend.engine import analyze_context
+# 🔥 IMPORT ENGINE (ajustalo a tu path real si cambia)
+from backend.engine import analyze_text
 
 app = FastAPI()
 
-# =========================
-# RATE LIMIT
-# =========================
-limiter = Limiter(key_func=get_remote_address)
+# ======================================================
+# 🌐 CORS (AJUSTAR EN PRODUCCIÓN)
+# ======================================================
 
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, lambda r, e: HTTPException(429, "Rate limit exceeded"))
-app.add_middleware(SlowAPIMiddleware)
-
-# =========================
-# CORS
-# =========================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # 🔒 luego limitar
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# =========================
-# HELPERS
-# =========================
+# ======================================================
+# 📦 REQUEST MODEL
+# ======================================================
 
-def normalize_engine_output(result: dict):
-
-    score = result.get("score", 0)
-    confidence = result.get("confidence", 0.5)
-
-    # 🔥 FIX: evitar 0 absoluto
-    if confidence == 0:
-        confidence = 0.45
-
-    # normalizar score a 0-1
-    score_norm = max(0, min(score / 100, 1))
-
-    return score_norm, confidence
+class VerifyRequest(BaseModel):
+    url: str
+    text: str
 
 
-def get_level(score: float):
+# ======================================================
+# 🔐 HELPERS
+# ======================================================
 
-    if score <= 0.2:
-        return "bajo"
-    elif score <= 0.6:
+def generate_analysis_key(url: str, text: str) -> str:
+    content_hash = hashlib.sha256(text.encode()).hexdigest()
+    base = f"{url}|{content_hash}|v13"
+    return hashlib.sha256(base.encode()).hexdigest()
+
+
+def calculate_level(score_norm: float) -> str:
+    if score_norm >= 0.7:
+        return "alto"
+    elif score_norm >= 0.3:
         return "moderado"
     else:
-        return "alto"
+        return "bajo"
 
 
-# =========================
-# ENDPOINT PRINCIPAL
-# =========================
+def build_message(level: str) -> str:
+    if level == "alto":
+        return "Se detectan múltiples señales de riesgo estructural."
+    elif level == "moderado":
+        return "Señales mixtas — lectura crítica recomendada."
+    else:
+        return "Bajo riesgo estructural detectado."
+
+
+def calculate_confidence(result: dict) -> int:
+    # 🔥 heurística simple (después la refinamos)
+    signals = len(result.get("reasons", []))
+    base = 30 + signals * 10
+    return max(10, min(base, 95))
+
+
+# ======================================================
+# 🚀 ENDPOINT PRINCIPAL
+# ======================================================
 
 @app.post("/v3/verify")
-@limiter.limit("30/minute")
-async def verify(request: Request):
+async def verify(req: VerifyRequest, request: Request):
 
-    data = await request.json()
+    # 🔐 HEADER VALIDATION
+    extension_id = request.headers.get("x-extension-id")
 
-    text = data.get("text", "")
-    url = data.get("url", "")
-    title = data.get("title", "")
+    if not extension_id:
+        raise HTTPException(status_code=401, detail="Extensión no autorizada")
 
-    if not text:
-        raise HTTPException(status_code=400, detail="No text provided")
+    # 🧠 GENERAR KEY DETERMINÍSTICA
+    analysis_key = generate_analysis_key(req.url, req.text)
 
-    # =========================
-    # ANALYSIS KEY (determinístico)
-    # =========================
-    raw_key = f"{url}|{text[:500]}"
-    analysis_key = hashlib.sha256(raw_key.encode()).hexdigest()
+    # ==================================================
+    # 🧠 ENGINE
+    # ==================================================
 
-    # =========================
-    # ENGINE CALL
-    # =========================
-    result = analyze_context(text, url, title)
+    try:
+        result = analyze_text(req.text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-    # =========================
-    # NORMALIZACIÓN
-    # =========================
-    score_norm, confidence = normalize_engine_output(result)
+    raw_score = result.get("score", 0)
 
-    # =========================
-    # NIVEL FINAL
-    # =========================
-    level = get_level(score_norm)
+    # ==================================================
+    # 🔥 FIX DE ESCALA (CLAVE)
+    # ==================================================
 
-    # 🔥 FIX CRÍTICO
-    if score_norm == 0:
-        level = "bajo"
+    if raw_score <= 5:
+        score_norm = raw_score / 20
+    else:
+        score_norm = raw_score / 100
 
-    # =========================
-    # RESPONSE
-    # =========================
-    return {
+    score_norm = max(0, min(score_norm, 1))
+
+    # ==================================================
+    # 🎯 NIVEL + MENSAJE
+    # ==================================================
+
+    level = calculate_level(score_norm)
+    message = build_message(level)
+
+    # ==================================================
+    # 📊 SCORE FINAL (0–100 VISUAL)
+    # ==================================================
+
+    score_visual = int(score_norm * 100)
+
+    # ==================================================
+    # 🧠 CONFIANZA
+    # ==================================================
+
+    confidence = calculate_confidence(result)
+
+    # ==================================================
+    # 📦 RESPONSE
+    # ==================================================
+
+    response = {
         "analysis_key": analysis_key,
-        "score": int(score_norm * 100),
+        "url": req.url,
         "level": level,
-        "confidence": round(confidence * 100),
-        "message": result.get("message", ""),
-        "signals": result.get("signals", []),
-        "insight": result.get("insight", ""),
-        "context": result.get("context", ""),
-        "source_type": result.get("source_type", ""),
-        "pro": result.get("pro", {})
+        "score": score_visual,
+        "confidence": confidence,
+        "message": message,
+        "details": result.get("reasons", []),
+        "timestamp": int(time.time())
     }
+
+    return response
+
+
+# ======================================================
+# 🩺 HEALTH CHECK
+# ======================================================
+
+@app.get("/")
+def root():
+    return {"status": "SignalCheck API running"}
