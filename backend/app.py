@@ -1,4 +1,4 @@
-print("APP FILE ACTUAL 14.6 - CONTEXT FIX REAL")
+print("APP FILE ACTUAL 14.7 - CONTEXT FIX FINAL")
 
 import os
 import json
@@ -23,9 +23,9 @@ from backend.utils.content_versioning import (
     build_analysis_key,
 )
 
-ENGINE_VERSION = "v14.6"
+ENGINE_VERSION = "v14.7"
 
-app = FastAPI(title="GE SignalCheck API — v14.6")
+app = FastAPI(title="GE SignalCheck API — v14.7")
 
 # =========================
 # RATE LIMIT
@@ -116,7 +116,7 @@ async def verify(
         ]
 
         if any(domain in url for domain in trusted_sources):
-            score *= 0.4
+            score = min(score, 0.35)
 
         elif any(domain in url for domain in low_trust_sources):
             score *= 1.4
@@ -147,7 +147,7 @@ async def verify(
             score *= 0.5
 
         # =========================
-        # 🔥 CONTEXTO PERIODÍSTICO (FIX CLAVE)
+        # 🔥 CONTEXTO PERIODÍSTICO (FIX REAL)
         # =========================
         journalistic_patterns = [
             "según",
@@ -160,10 +160,10 @@ async def verify(
         ]
 
         if any(p in text_lower for p in journalistic_patterns):
-            score *= 0.6
+            score = min(score, 0.45)
 
         # =========================
-        # 🔥 FACT CHECK (FIX CLAVE)
+        # 🔥 FACT CHECK (FIX REAL)
         # =========================
         factcheck_patterns = [
             "no es cierto",
@@ -174,7 +174,7 @@ async def verify(
         ]
 
         if any(p in text_lower for p in factcheck_patterns):
-            score *= 0.3
+            score = min(score, 0.25)
 
         # =========================
         # 🔥 CLAMP FINAL
