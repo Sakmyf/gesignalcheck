@@ -64,7 +64,7 @@ def analyze_context(text: str, url: str = "", title: str = ""):
 
             # 🔥 CLAVE: NO usamos abs()
             # solo valores positivos representan riesgo
-            return max(0.0, min(val, 1.0))
+            return min(abs(val), 1.0)
 
         # ===============================
         # MÓDULOS
