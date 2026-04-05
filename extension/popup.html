@@ -21,25 +21,22 @@
     <!-- RESULTADO -->
     <div id="labelBadge" class="signal-label">Iniciando...</div>
 
-    <!-- 🔥 SCORE -->
+    <!-- SCORE -->
     <div class="score-container">
-
       <div class="score-main">
         <span id="scoreValue">--</span>
         <span class="score-label">/100</span>
       </div>
-
       <div class="confidence">
         Confianza: <span id="confidenceValue">--</span>%
       </div>
-
     </div>
 
     <!-- INSIGHT -->
     <div id="summary" class="hidden insight-box"></div>
 
-    <!-- 🔒 BLOQUE PRO (NUEVO) -->
-    <div class="pro-section locked">
+    <!-- 🔒 PRO SECTION -->
+    <div id="proSection" class="pro-section locked">
 
       <div class="pro-title">🔍 Análisis avanzado</div>
 
@@ -50,8 +47,15 @@
         <li>Coherencia: 🔒</li>
       </ul>
 
+      <!-- ⚠️ WARNING -->
+      <div id="proWarning" class="pro-warning">
+        ⚠️ Hay señales más profundas que no estás viendo<br>
+        Este contenido puede influir en cómo lo interpretás
+      </div>
+
+      <!-- 🔓 BOTÓN PRO -->
       <button id="upgradeBtn" class="upgrade-btn">
-        Desbloquear análisis completo
+        🔓 Ver análisis completo
       </button>
 
     </div>

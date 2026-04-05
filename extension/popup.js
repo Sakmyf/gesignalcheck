@@ -9,25 +9,20 @@ document.addEventListener("DOMContentLoaded", () => {
   const scoreEl    = document.getElementById("scoreValue");
   const confEl     = document.getElementById("confidenceValue");
 
-  const unlockBtn =
-    document.getElementById("upgradeBtn") ||
-    document.getElementById("unlockBtn")  ||
-    document.querySelector("button.upgrade-btn");
-
-  const proSection = document.querySelector(".pro-section");
+  const upgradeBtn = document.getElementById("upgradeBtn");
+  const proSection = document.getElementById("proSection");
+  const proWarning = document.getElementById("proWarning");
 
   function startScanUI() {
     if (scanLine) scanLine.classList.add("active");
 
-    if (labelBadge) {
-      labelBadge.textContent  = "Analizando contenido...";
-      labelBadge.style.background = "#333";
-      labelBadge.style.color      = "#aaa";
-    }
+    labelBadge.textContent = "Analizando contenido...";
+    labelBadge.style.background = "#333";
+    labelBadge.style.color = "#aaa";
 
-    if (summaryBox) summaryBox.classList.add("hidden");
-    if (scoreEl) scoreEl.textContent = "--";
-    if (confEl)  confEl.textContent  = "--";
+    summaryBox.classList.add("hidden");
+    scoreEl.textContent = "--";
+    confEl.textContent = "--";
   }
 
   function stopScanUI() {
@@ -45,8 +40,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-      if (!tab?.id || tab.url.startsWith("chrome://") || tab.url.startsWith("chrome-extension://")) {
-        if (labelBadge) labelBadge.textContent = "Página no compatible";
+      if (!tab?.id || tab.url.startsWith("chrome://")) {
+        labelBadge.textContent = "Página no compatible";
         stopScanUI();
         return;
       }
@@ -56,22 +51,21 @@ document.addEventListener("DOMContentLoaded", () => {
           target: { tabId: tab.id },
           files: ["content_script.js"]
         });
-      } catch (_) {}
+      } catch {}
 
       await new Promise(r => setTimeout(r, 150));
 
       chrome.tabs.sendMessage(tab.id, { action: "extractText" }, async (extracted) => {
 
-        if (chrome.runtime.lastError || !extracted) {
-          if (labelBadge) labelBadge.textContent = "Error leyendo página";
+        if (!extracted) {
+          labelBadge.textContent = "Error leyendo página";
           stopScanUI();
           return;
         }
 
-        const textToSend = extracted.text || "";
-
-        if (textToSend.length < 30) {
-          if (labelBadge) labelBadge.textContent = "Texto insuficiente";
+        const text = extracted.text || "";
+        if (text.length < 30) {
+          labelBadge.textContent = "Texto insuficiente";
           stopScanUI();
           return;
         }
@@ -85,16 +79,10 @@ document.addEventListener("DOMContentLoaded", () => {
               "x-extension-id": chrome.runtime.id
             },
             body: JSON.stringify({
-              text: textToSend,
-              url:  extracted.url || tab.url
+              text,
+              url: extracted.url || tab.url
             })
           });
-
-          if (!res.ok) {
-            if (labelBadge) labelBadge.textContent = "Error del servidor (" + res.status + ")";
-            stopScanUI();
-            return;
-          }
 
           const data = await res.json();
 
@@ -105,17 +93,15 @@ document.addEventListener("DOMContentLoaded", () => {
             stopScanUI();
           }, wait);
 
-        } catch (e) {
-          console.error("❌ fetch error:", e);
-          if (labelBadge) labelBadge.textContent = "Error de conexión";
+        } catch {
+          labelBadge.textContent = "Error de conexión";
           stopScanUI();
         }
 
       });
 
-    } catch (err) {
-      console.error("❌ Error general:", err);
-      if (labelBadge) labelBadge.textContent = "Error inesperado";
+    } catch {
+      labelBadge.textContent = "Error inesperado";
       stopScanUI();
     }
   }
@@ -123,111 +109,58 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderResult(data) {
 
     const analysis = data?.analysis || data;
-    if (!analysis) {
-      if (labelBadge) labelBadge.textContent = "Sin datos";
-      return;
-    }
+    if (!analysis) return;
 
     const level = (analysis.level || "medio").toLowerCase();
 
-    if (labelBadge) {
-      if (level === "bajo") {
-        labelBadge.textContent = "🟢 Bajo riesgo";
-        labelBadge.style.background = "rgba(34,197,94,0.2)";
-        labelBadge.style.color = "#4ade80";
-      } else if (level === "medio") {
-        labelBadge.textContent = "🟡 Riesgo moderado";
-        labelBadge.style.background = "rgba(250,204,21,0.2)";
-        labelBadge.style.color = "#facc15";
-      } else {
-        labelBadge.textContent = "🔴 Alto riesgo";
-        labelBadge.style.background = "rgba(239,68,68,0.2)";
-        labelBadge.style.color = "#f87171";
-      }
+    if (level === "bajo") {
+      labelBadge.textContent = "🟢 Bajo riesgo";
+      labelBadge.style.background = "rgba(34,197,94,0.2)";
+      labelBadge.style.color = "#4ade80";
+    } else if (level === "medio") {
+      labelBadge.textContent = "🟡 Riesgo moderado";
+      labelBadge.style.background = "rgba(250,204,21,0.2)";
+      labelBadge.style.color = "#facc15";
+    } else {
+      labelBadge.textContent = "🔴 Alto riesgo";
+      labelBadge.style.background = "rgba(239,68,68,0.2)";
+      labelBadge.style.color = "#f87171";
     }
 
-    const rawScore = analysis.structural_index;
-    if (scoreEl && rawScore !== undefined) {
-      scoreEl.textContent = rawScore <= 1.0
-        ? Math.round(rawScore * 100)
-        : Math.round(rawScore);
-    }
+    const score = analysis.structural_index ?? 0;
+    scoreEl.textContent = score <= 1 ? Math.round(score * 100) : Math.round(score);
 
-    const conf = analysis.confidence;
-    if (confEl && conf !== undefined) {
-      confEl.textContent = conf <= 1.0
-        ? Math.round(conf * 100)
-        : Math.round(conf);
-    }
+    const conf = analysis.confidence ?? 0;
+    confEl.textContent = conf <= 1 ? Math.round(conf * 100) : Math.round(conf);
 
-    if (summaryBox) {
-      summaryBox.textContent =
-        analysis.insight ||
-        analysis.summary ||
-        "Análisis completado.";
-      summaryBox.classList.remove("hidden");
-    }
+    summaryBox.textContent =
+      analysis.insight ||
+      "El contenido no presenta señales relevantes de manipulación o riesgo.";
 
-    // ============================
-    // 🔐 CONTROL PLAN
-    // ============================
+    summaryBox.classList.remove("hidden");
+
     const plan = data?.meta?.plan || "free";
 
+    // 🔐 CONTROL PRO (FIX REAL)
     if (plan === "free") {
 
-      if (proSection) {
-        proSection.classList.add("locked");
+      proSection.classList.add("locked");
 
-        proSection.innerHTML = `
-          <div style="margin-top:10px; font-size:12px; color:#aaa;">
-            ⚠️ Hay señales más profundas que no estás viendo<br>
-            Este contenido puede influir en cómo lo interpretás
-          </div>
-        `;
-      }
-
-      if (unlockBtn) {
-        unlockBtn.style.display = "block";
-        unlockBtn.textContent = "Ver qué significa y qué hacer";
-      }
+      if (proWarning) proWarning.style.display = "block";
+      if (upgradeBtn) upgradeBtn.style.display = "block";
 
     } else {
 
-      if (proSection) {
-        proSection.classList.remove("locked");
+      proSection.classList.remove("locked");
 
-        const pro = analysis.pro || {};
+      if (proWarning) proWarning.style.display = "none";
+      if (upgradeBtn) upgradeBtn.style.display = "none";
 
-        proSection.innerHTML = `
-          <div style="margin-top:10px;">
-            
-            <div style="font-size:13px; font-weight:600; color:#f87171;">
-              ⚠️ ${pro.alert || "Análisis avanzado"}
-            </div>
-
-            <div style="font-size:12px; margin-top:6px; color:#ccc;">
-              ${pro.interpretation || ""}
-            </div>
-
-            <div style="font-size:12px; margin-top:8px; color:#aaa;">
-              <strong>Recomendación:</strong><br>
-              ${pro.action || ""}
-            </div>
-
-            <div style="font-size:11px; margin-top:8px; color:#777;">
-              ${pro.content_profile || ""}
-            </div>
-
-          </div>
-        `;
-      }
-
-      if (unlockBtn) unlockBtn.style.display = "none";
     }
   }
 
-  if (unlockBtn) {
-    unlockBtn.addEventListener("click", () => {
+  if (upgradeBtn) {
+    upgradeBtn.addEventListener("click", () => {
       chrome.tabs.create({
         url: "https://gesignalcheck.com/analysis"
       });
