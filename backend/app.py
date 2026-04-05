@@ -1,245 +1,151 @@
-print("APP FILE ACTUAL 14.7 - CONTEXT FIX FINAL")
+# ======================================================
+# SIGNALCHECK BACKEND – STABLE + CONTEXT FIX
+# ======================================================
 
-import os
-import json
-import traceback
-
-from fastapi import FastAPI, HTTPException, Header, Depends, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
-
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-
-from backend.database import engine, get_db
-from backend.models import Base, Extension, AnalysisLog
-from backend.engine import analyze_context
-from backend.final_adjustment import apply_context_adjustment
-from backend.utils.content_versioning import (
-    generate_content_hash,
-    build_analysis_key,
-)
-
-ENGINE_VERSION = "v14.7"
-
-app = FastAPI(title="GE SignalCheck API — v14.7")
+import hashlib
+import time
 
 # =========================
-# RATE LIMIT
+# IMPORTS DEL MOTOR
 # =========================
-def get_rate_key(request: Request):
-    ext = request.headers.get("x-extension-id")
-    return f"ext:{ext}" if ext else get_remote_address(request)
+from backend.engine import analyze_content
 
-limiter = Limiter(key_func=get_rate_key)
-app.state.limiter = limiter
-
-@app.exception_handler(RateLimitExceeded)
-def rate_limit_handler(request: Request, exc):
-    return JSONResponse(status_code=429, content={"detail": "Demasiadas solicitudes"})
+app = FastAPI()
 
 # =========================
-# CORS
+# CORS (PRODUCCIÓN SIMPLE)
 # =========================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # después lo cerramos si querés
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-def startup():
-    Base.metadata.create_all(bind=engine)
-
 # =========================
-# MODELO
+# MODELO REQUEST
 # =========================
-class VerifyRequest(BaseModel):
+class AnalyzeRequest(BaseModel):
     url: str
-    text: str
+    content: str
 
 # =========================
-# ENDPOINT
+# UTIL: HASH DETERMINÍSTICO
+# =========================
+def generate_analysis_key(url: str, content: str) -> str:
+    raw = f"{url}|{hashlib.sha256(content.encode()).hexdigest()}|v13"
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+# =========================
+# CONTEXT OVERRIDE (CLAVE)
+# =========================
+def apply_context_override(score: float, url: str) -> float:
+
+    url = url.lower()
+
+    institutional_domains = [
+        "gob.ar",
+        "argentina.gob.ar",
+        "indec.gob.ar",
+        "casa rosada",
+        "usa.gov",
+        "gov",
+        "edu"
+    ]
+
+    factcheck_domains = [
+        "maldita.es",
+        "chequeado.com",
+        "factcheck.org"
+    ]
+
+    if any(domain in url for domain in institutional_domains):
+        return min(score, 0.15)
+
+    if any(domain in url for domain in factcheck_domains):
+        return min(score, 0.20)
+
+    return score
+
+# =========================
+# MAPEO SCORE → NIVEL
+# =========================
+def get_level(score: float) -> str:
+    if score < 0.3:
+        return "bajo"
+    elif score < 0.6:
+        return "moderado"
+    else:
+        return "alto"
+
+# =========================
+# MENSAJE UX
+# =========================
+def get_message(score: float) -> str:
+
+    if score < 0.3:
+        return "El contenido no presenta señales relevantes de manipulación o riesgo."
+
+    elif score < 0.6:
+        return "Se detectan ciertos patrones que requieren una lectura más atenta."
+
+    else:
+        return "Se detectan múltiples señales asociadas a contenido potencialmente problemático."
+
+# =========================
+# ENDPOINT PRINCIPAL
 # =========================
 @app.post("/v3/verify")
-@limiter.limit("20/minute")
-async def verify(
-    request: Request,
-    data: VerifyRequest,
-    x_extension_id: str = Header(None),
-    db: Session = Depends(get_db)
-):
+async def verify(data: AnalyzeRequest, request: Request):
 
-    if not x_extension_id:
-        raise HTTPException(status_code=401, detail="Extensión no identificada")
-
-    text = data.text
-    url  = data.url or ""
-
-    content_hash = generate_content_hash(text)
-    analysis_key = build_analysis_key(url, content_hash, ENGINE_VERSION, "v3")
-
-    cached = db.query(AnalysisLog).filter(AnalysisLog.analysis_key == analysis_key).first()
-    if cached:
-        return json.loads(cached.response_json)
-
-    try:
-        result = analyze_context(text, url)
-        result = apply_context_adjustment(result)
-
-        score = float(result.get("score", 0))
-        signals = result.get("signals", [])
-
-        text_lower = text.lower()
-
-        # =========================
-        # 🔥 AJUSTE POR FUENTE
-        # =========================
-        trusted_sources = [
-            "nytimes.com",
-            "indec.gob.ar",
-            "vatican.va",
-            "bbc.com",
-            "reuters.com",
-            "cnn.com"
-        ]
-
-        low_trust_sources = [
-            "facebook.com",
-            "tiktok.com",
-            "blogspot.com",
-            "escupetudessarrollo.com"
-        ]
-
-        if any(domain in url for domain in trusted_sources):
-            score = min(score, 0.35)
-
-        elif any(domain in url for domain in low_trust_sources):
-            score *= 1.4
-
-        # =========================
-        # 🔥 SENSACIONALISMO
-        # =========================
-        sensational_patterns = [
-            "último momento",
-            "no vas a creer",
-            "pánico",
-            "urgente",
-            "impactante"
-        ]
-
-        if any(p in text_lower for p in sensational_patterns):
-            score += 0.25
-
-        # =========================
-        # 🔥 CONTENIDO TÉCNICO
-        # =========================
-        technical_keywords = [
-            "índice", "metodología", "estadística",
-            "datos", "informe", "relevamiento"
-        ]
-
-        if any(k in text_lower for k in technical_keywords):
-            score *= 0.5
-
-        # =========================
-        # 🔥 CONTEXTO PERIODÍSTICO (FIX REAL)
-        # =========================
-        journalistic_patterns = [
-            "según",
-            "reportó",
-            "de acuerdo a",
-            "fuentes",
-            "informó",
-            "explicó",
-            "indicó"
-        ]
-
-        if any(p in text_lower for p in journalistic_patterns):
-            score = min(score, 0.45)
-
-        # =========================
-        # 🔥 FACT CHECK (FIX REAL)
-        # =========================
-        factcheck_patterns = [
-            "no es cierto",
-            "es falso",
-            "desmentido",
-            "verificación",
-            "fact-check"
-        ]
-
-        if any(p in text_lower for p in factcheck_patterns):
-            score = min(score, 0.25)
-
-        # =========================
-        # 🔥 CLAMP FINAL
-        # =========================
-        score = max(0, min(score, 1))
-
-    except Exception:
-        traceback.print_exc()
-        score = 0
-        signals = []
+    if not data.url or not data.content:
+        raise HTTPException(status_code=400, detail="Faltan datos")
 
     # =========================
-    # NORMALIZACIÓN SCORE
+    # HASH
     # =========================
-    score_int = int(round(score * 100)) if score <= 1.0 else int(score)
+    analysis_key = generate_analysis_key(data.url, data.content)
 
     # =========================
-    # NORMALIZACIÓN LEVEL
+    # MOTOR BASE
     # =========================
-    if score < 0.20:
-        level   = "bajo"
-        summary = "El contenido no presenta patrones estructurales de riesgo."
-    elif score < 0.55:
-        level   = "medio"
-        summary = "El contenido requiere lectura crítica."
-    else:
-        level   = "alto"
-        summary = "Se detecta presión narrativa significativa."
+    base_result = analyze_content(data.content)
 
-    indicators = [{"title": s} for s in signals[:5]]
+    score = base_result.get("score", 0.0)
+    confidence = base_result.get("confidence", 0.5)
 
-    pro = result.get("pro", {})
+    # =========================
+    # 🔥 CONTEXT FIX
+    # =========================
+    score = apply_context_override(score, data.url)
 
-    response = {
-        "analysis": {
-            "level":            level,
-            "summary":          summary,
-            "message":          result.get("message", summary),
-            "insight":          result.get("insight", ""),
+    # Clamp final (seguridad)
+    score = max(0.0, min(score, 1.0))
 
-            "score":            score_int,
-            "structural_index": score_int,
+    # =========================
+    # OUTPUT
+    # =========================
+    level = get_level(score)
+    message = get_message(score)
 
-            "confidence":       result.get("confidence", 0),
-            "context":          result.get("context", "general"),
-            "source_type":      result.get("source_type", "unknown"),
-            "signals":          signals[:6],
-            "indicators":       indicators,
-            "commercial_risk":  result.get("commercial_risk", {}),
-            "pro":              pro,
-        },
-        "meta": {
-            "engine_version": ENGINE_VERSION,
-            "analysis_key":   analysis_key,
-            "plan":           "free"
-        }
+    return {
+        "analysis_key": analysis_key,
+        "url": data.url,
+        "score": round(score * 100),
+        "level": level,
+        "confidence": round(confidence * 100),
+        "message": message,
+        "timestamp": int(time.time()),
+        "engine_version": "v13-context-fix"
     }
 
-    db.add(AnalysisLog(
-        risk_index=score,
-        level=level,
-        engine_version=ENGINE_VERSION,
-        analysis_key=analysis_key,
-        response_json=json.dumps(response)
-    ))
-    db.commit()
-
-    return response
+# =========================
+# HEALTH CHECK
+# =========================
+@app.get("/")
+def root():
+    return {"status": "SignalCheck backend operativo"}
