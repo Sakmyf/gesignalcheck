@@ -1,4 +1,4 @@
-print("APP FILE ACTUAL 14.3 - PRO FROM ENGINE + SCORE 0-100")
+print("APP FILE ACTUAL 14.4 - FIX SCORE + LEVEL COMPAT")
 
 import os
 import json
@@ -23,9 +23,9 @@ from backend.utils.content_versioning import (
     build_analysis_key,
 )
 
-ENGINE_VERSION = "v14.3"
+ENGINE_VERSION = "v14.4"
 
-app = FastAPI(title="GE SignalCheck API — v14.3")
+app = FastAPI(title="GE SignalCheck API — v14.4")
 
 # =========================
 # RATE LIMIT
@@ -99,25 +99,28 @@ async def verify(
         signals = []
 
     # =========================
-    # NORMALIZACIÓN
-    # engine v13.8 devuelve score como float 0-1
-    # app lo convierte a entero 0-100 y normaliza level
+    # NORMALIZACIÓN SCORE
     # =========================
     score_int = int(round(score * 100)) if score <= 1.0 else int(score)
 
+    # =========================
+    # NORMALIZACIÓN LEVEL (FIX)
+    # =========================
     if score < 0.20:
-        level   = "green"
+        level   = "bajo"
         summary = "El contenido no presenta patrones estructurales de riesgo."
     elif score < 0.55:
-        level   = "yellow"
+        level   = "medio"
         summary = "El contenido requiere lectura crítica."
     else:
-        level   = "red"
+        level   = "alto"
         summary = "Se detecta presión narrativa significativa."
 
     indicators = [{"title": s} for s in signals[:5]]
 
-    # PRO viene del engine — rico y estructurado
+    # =========================
+    # PRO
+    # =========================
     pro = result.get("pro", {})
 
     response = {
@@ -126,7 +129,11 @@ async def verify(
             "summary":          summary,
             "message":          result.get("message", summary),
             "insight":          result.get("insight", ""),
+            
+            # 🔥 FIX CLAVE
             "score":            score_int,
+            "structural_index": score_int,
+
             "confidence":       result.get("confidence", 0),
             "context":          result.get("context", "general"),
             "source_type":      result.get("source_type", "unknown"),
