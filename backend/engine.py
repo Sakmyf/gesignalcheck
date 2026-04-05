@@ -1,5 +1,5 @@
 # ======================================================
-# SIGNALCHECK ENGINE v13.9 (FIX SCORE REAL)
+# SIGNALCHECK ENGINE v14.0 (FIX REAL CALIBRATION)
 # ======================================================
 
 import traceback
@@ -54,7 +54,7 @@ def analyze_context(text: str, url: str = "", title: str = ""):
         weights = adjust_weights(BASE_WEIGHTS, context, source_info)
 
         # ===============================
-        # 🔥 NORMALIZADOR CLAVE (FIX REAL)
+        # 🔥 NORMALIZADOR CORRECTO
         # ===============================
         def _get_p(res):
             if isinstance(res, dict):
@@ -62,8 +62,9 @@ def analyze_context(text: str, url: str = "", title: str = ""):
             else:
                 val = getattr(res, "points", 0.0)
 
-            # 👉 convierte todo a positivo y usable
-            return max(0.0, min(abs(val), 1.0))
+            # 🔥 CLAVE: NO usamos abs()
+            # solo valores positivos representan riesgo
+            return max(0.0, min(val, 1.0))
 
         # ===============================
         # MÓDULOS
@@ -119,19 +120,21 @@ def analyze_context(text: str, url: str = "", title: str = ""):
             risk_score -= (trust_bonus * 0.5)
 
         # ===============================
-        # 🔥 PISO REAL
+        # 🔥 CLAMP REAL (SIN piso artificial)
         # ===============================
-        risk_score = max(0.05, min(risk_score, 1.0))
+        risk_score = max(0.0, min(risk_score, 1.0))
 
         # ===============================
-        # 🔥 ESCALA MÁS INTELIGENTE
+        # 🔥 ESCALA MEJORADA
         # ===============================
         if risk_score < 0.2:
-            final_score = int(5 + risk_score * 50)
+            final_score = int(risk_score * 100)
         elif risk_score < 0.5:
-            final_score = int(15 + risk_score * 70)
+            final_score = int(risk_score * 110)
         else:
-            final_score = int(50 + risk_score * 100)
+            final_score = int(risk_score * 120)
+
+        final_score = min(final_score, 100)
 
         # ===============================
         # LEVEL
