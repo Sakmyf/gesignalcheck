@@ -1,5 +1,5 @@
 # ======================================================
-# SIGNALCHECK BACKEND – STABLE + CONTEXT FIX
+# SIGNALCHECK BACKEND – STABLE FINAL (ENGINE COMPATIBLE)
 # ======================================================
 
 from fastapi import FastAPI, Request, HTTPException
@@ -9,39 +9,39 @@ import hashlib
 import time
 
 # =========================
-# IMPORTS DEL MOTOR
+# IMPORT DEL ENGINE REAL
 # =========================
-from backend.engine import analyze_content
+from backend.engine import analyze  # 🔥 FIX IMPORT
 
 app = FastAPI()
 
 # =========================
-# CORS (PRODUCCIÓN SIMPLE)
+# CORS (SIMPLE PROD)
 # =========================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # después lo cerramos si querés
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # =========================
-# MODELO REQUEST
+# REQUEST MODEL
 # =========================
 class AnalyzeRequest(BaseModel):
     url: str
     content: str
 
 # =========================
-# UTIL: HASH DETERMINÍSTICO
+# HASH DETERMINÍSTICO
 # =========================
 def generate_analysis_key(url: str, content: str) -> str:
     raw = f"{url}|{hashlib.sha256(content.encode()).hexdigest()}|v13"
     return hashlib.sha256(raw.encode()).hexdigest()
 
 # =========================
-# CONTEXT OVERRIDE (CLAVE)
+# CONTEXT OVERRIDE
 # =========================
 def apply_context_override(score: float, url: str) -> float:
 
@@ -51,10 +51,10 @@ def apply_context_override(score: float, url: str) -> float:
         "gob.ar",
         "argentina.gob.ar",
         "indec.gob.ar",
-        "casa rosada",
+        "casarosada.gob.ar",
         "usa.gov",
-        "gov",
-        "edu"
+        ".gov",
+        ".edu"
     ]
 
     factcheck_domains = [
@@ -72,7 +72,7 @@ def apply_context_override(score: float, url: str) -> float:
     return score
 
 # =========================
-# MAPEO SCORE → NIVEL
+# SCORE → NIVEL
 # =========================
 def get_level(score: float) -> str:
     if score < 0.3:
@@ -83,7 +83,7 @@ def get_level(score: float) -> str:
         return "alto"
 
 # =========================
-# MENSAJE UX
+# MENSAJE UX COHERENTE
 # =========================
 def get_message(score: float) -> str:
 
@@ -95,6 +95,24 @@ def get_message(score: float) -> str:
 
     else:
         return "Se detectan múltiples señales asociadas a contenido potencialmente problemático."
+
+# =========================
+# NORMALIZADOR ENGINE (CLAVE)
+# =========================
+def normalize_engine_output(result: dict):
+
+    # fallback seguro
+    score = result.get("score", 0.0)
+    confidence = result.get("confidence", 0.5)
+
+    # por si viene en otro formato
+    if score > 1:
+        score = score / 100
+
+    if confidence > 1:
+        confidence = confidence / 100
+
+    return score, confidence
 
 # =========================
 # ENDPOINT PRINCIPAL
@@ -111,20 +129,20 @@ async def verify(data: AnalyzeRequest, request: Request):
     analysis_key = generate_analysis_key(data.url, data.content)
 
     # =========================
-    # MOTOR BASE
+    # MOTOR
     # =========================
-    base_result = analyze_content(data.content)
+    base_result = analyze(data.content)
 
-    score = base_result.get("score", 0.0)
-    confidence = base_result.get("confidence", 0.5)
+    score, confidence = normalize_engine_output(base_result)
 
     # =========================
     # 🔥 CONTEXT FIX
     # =========================
     score = apply_context_override(score, data.url)
 
-    # Clamp final (seguridad)
+    # Clamp final
     score = max(0.0, min(score, 1.0))
+    confidence = max(0.0, min(confidence, 1.0))
 
     # =========================
     # OUTPUT
@@ -135,12 +153,12 @@ async def verify(data: AnalyzeRequest, request: Request):
     return {
         "analysis_key": analysis_key,
         "url": data.url,
-        "score": round(score * 100),
+        "score": int(score * 100),
         "level": level,
-        "confidence": round(confidence * 100),
+        "confidence": int(confidence * 100),
         "message": message,
         "timestamp": int(time.time()),
-        "engine_version": "v13-context-fix"
+        "engine_version": "v13-context-stable"
     }
 
 # =========================
