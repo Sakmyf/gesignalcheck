@@ -89,7 +89,7 @@ async def verify(req: VerifyRequest, request: Request):
     # 🔥 YA VIENE EN 0–100 → NO TOCAR
     score_visual = int(raw_score)
 
-    confidence = int(result.get("confidence", 0))
+    confidence = int(result.get("confidence", 0) * 100)
 
     message = result.get("message", "")
 

@@ -125,7 +125,7 @@ def analyze_context(text: str, url: str = "", title: str = ""):
             risk_score -= (trust_bonus * 0.5)
 
         # 6. Normalización Final y Clasificación
-        risk_score = max(0.0, min(risk_score, 1.0))
+        risk_score = max(0.02, min(risk_score, 1.0))
 
         if risk_score >= 0.55:
             level, message = "red", "Presión narrativa significativa detectada"
