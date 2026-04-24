@@ -68,6 +68,36 @@ if (!window.__SignalCheckInjected__) {
   }
 
   // ------------------------------------------------------
+  // NUEVO: DETECTAR ENTORNO COMERCIAL (FUNNELS / E-COMMERCE)
+  // ------------------------------------------------------
+  function detectEcommerceContext() {
+    const ecomSelectors = [
+      'button[name="add-to-cart"]',
+      '.add-to-cart',
+      'a[href*="checkout"]',
+      '.cart-icon',
+      '[data-testid="checkout-button"]',
+      'a[href*="pay.hotmart.com"]', // Pasarelas conocidas
+      '.price-tag'
+    ];
+    
+    // 1. Buscar clases o IDs típicos de comercio
+    const hasCommerceElements = ecomSelectors.some(selector => document.querySelector(selector) !== null);
+    
+    // 2. Buscar intenciones de compra en botones
+    const buttons = Array.from(document.querySelectorAll('button, a'));
+    const hasBuyText = buttons.some(btn => {
+       const text = (btn.textContent || "").toLowerCase();
+       return text.includes('comprar ahora') || 
+              text.includes('añadir al carrito') || 
+              text.includes('inscribirme') ||
+              text.includes('comprar');
+    });
+
+    return hasCommerceElements || hasBuyText;
+  }
+
+  // ------------------------------------------------------
   // EXTRAER TEXTO LIMPIO
   // ------------------------------------------------------
   function extractCleanText() {
@@ -107,12 +137,14 @@ if (!window.__SignalCheckInjected__) {
 
     try {
       const cleanText = extractCleanText();
+      const isEcommerce = detectEcommerceContext(); // ¡Ejecutamos el radar!
 
       sendResponse({
         ok: true, 
         text: cleanText,
         url: window.location.href,
-        title: document.title || ""
+        title: document.title || "",
+        is_ecommerce: isEcommerce // Se lo pasamos a popup.js
       });
 
     } catch (error) {
@@ -122,7 +154,8 @@ if (!window.__SignalCheckInjected__) {
         text: "",
         url: window.location.href,
         title: document.title || "",
-        error: true
+        error: true,
+        is_ecommerce: false
       });
     }
 

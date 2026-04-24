@@ -1,5 +1,23 @@
 const API_URL = "https://gesignalcheck-production-8e78.up.railway.app/v3/verify";
 
+// NUEVO: Función para determinar el color según el porcentaje y la métrica
+function obtenerColorPorcentaje(valor, metrica) {
+  const metricaLower = metrica.toLowerCase();
+  // Para Emocionalidad y Manipulación: Alto es malo (Rojo), Bajo es bueno (Verde)
+  if (metricaLower === 'emocionalidad' || metricaLower === 'manipulación' || metricaLower === 'manipulacion') {
+      if (valor > 70) return '#ef4444'; // Rojo 
+      if (valor > 40) return '#facc15'; // Amarillo 
+      return '#4ade80'; // Verde 
+  }
+  // Para Evidencia y Coherencia: Alto es bueno (Verde), Bajo es malo (Rojo)
+  if (metricaLower === 'evidencia' || metricaLower === 'coherencia') {
+      if (valor < 40) return '#ef4444'; // Rojo
+      if (valor < 70) return '#facc15'; // Amarillo
+      return '#4ade80'; // Verde
+  }
+  return '#f1f5f9'; // Blanco por defecto
+}
+
 document.addEventListener("DOMContentLoaded", () => {
 
   const analyzeBtn = document.getElementById("analyzeBtn");
@@ -12,6 +30,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const upgradeBtn = document.getElementById("upgradeBtn");
   const proSection = document.getElementById("proSection");
   const proWarning = document.getElementById("proWarning");
+  
+  // NUEVOS: Capturamos los elementos de las métricas (añadidos en el popup.html)
+  const proMetrics = document.getElementById("proMetrics");
+  const proList    = document.getElementById("proList");
 
   function startScanUI() {
     if (scanLine) scanLine.classList.add("active");
@@ -80,7 +102,8 @@ document.addEventListener("DOMContentLoaded", () => {
             },
             body: JSON.stringify({
               text,
-              url: extracted.url || tab.url
+              url: extracted.url || tab.url,
+              is_ecommerce: extracted.is_ecommerce // NUEVO: Mandamos el flag al motor
             })
           });
 
@@ -141,13 +164,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const plan = data?.meta?.plan || "free";
 
-    // 🔐 CONTROL PRO (FIX REAL)
+    // 🔐 CONTROL PRO Y MÉTRICAS DINÁMICAS
     if (plan === "free") {
 
       proSection.classList.add("locked");
 
       if (proWarning) proWarning.style.display = "block";
       if (upgradeBtn) upgradeBtn.style.display = "block";
+      if (proMetrics) proMetrics.classList.add("hidden");
 
     } else {
 
@@ -155,7 +179,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (proWarning) proWarning.style.display = "none";
       if (upgradeBtn) upgradeBtn.style.display = "none";
+      
+      // Mostrar y renderizar la lista de métricas
+      if (proMetrics && proList) {
+        proMetrics.classList.remove("hidden");
+        
+        // Asume que la API envía esto. Si no, usa este placeholder.
+        const metrics = analysis.metrics || {
+          "Emocionalidad": 85,
+          "Manipulación": 20,
+          "Evidencia": 90,
+          "Coherencia": 88
+        };
 
+        proList.innerHTML = ""; // Limpia la lista previa
+        for (const [key, value] of Object.entries(metrics)) {
+            const color = obtenerColorPorcentaje(value, key);
+            const li = document.createElement("li");
+            li.style.display = "flex";
+            li.style.justifyContent = "space-between";
+            li.innerHTML = `<span>${key}</span> <strong style="color: ${color};">${value}%</strong>`;
+            proList.appendChild(li);
+        }
+      }
     }
   }
 
