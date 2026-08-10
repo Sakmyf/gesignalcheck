@@ -41,7 +41,7 @@ GLOBAL_EXECUTOR = ThreadPoolExecutor(
 )
 
 
-ENGINE_VERSION = "15.30-interpret-fix"
+ENGINE_VERSION = "15.31-news-floor-fix"
 
 # Fail-closed: si fallan más de este número de módulos ponderados,
 # el análisis no es confiable y se devuelve level "error" en vez de
@@ -454,6 +454,25 @@ def _apply_critical_floors(
     if institutional_like:
         return risk_score
 
+    # v15.31 - Corte de noticias ANTES de cualquier piso comercial/financiero.
+    # Un portal periodistico (iprofesional, ambito, cronista...) arrastra en el
+    # texto extraido su propio "chrome": ticker de dolar/cripto/acciones, menu
+    # ("acceder", "ingresar") y formulario de newsletter ("nombre", "email").
+    # Eso disparaba a la vez FINANCIAL_RE + FORM_RE => financial_landing=True,
+    # y commercial_risk="alto" por acumulacion de ruido del SITIO, no de la nota.
+    # Con los pisos financieros evaluados primero, una nota real (Galaxy A27,
+    # "emergencia turistica") saltaba a 0.60-0.80 = ALTO. El escudo news_like
+    # (techo 0.42 en _apply_risk_shields) nunca llegaba a aplicarse porque el
+    # piso ya habia elevado el score.
+    #
+    # Regla: si es medio periodistico, NINGUN piso comercial/financiero aplica.
+    # La unica excepcion que si debe pisar a una noticia es el senuelo de
+    # dinero/premio viral (wealth_lure_pattern), que se maneja en el bloque
+    # de abajo con su propio `not news_like`.
+    if news_like:
+        if "wealth_lure_pattern" not in promises_reasons:
+            return risk_score
+
     financial_landing = _has_financial_landing_intent(text, url, comm_data)
     roi_detected = bool(ROI_RE.search(text or ""))
 
@@ -474,38 +493,36 @@ def _apply_critical_floors(
     if has_promise and financial_landing:
         return max(risk_score, 0.50)
 
-    # v15.26 — Señuelo de dinero/premio sin contraprestación.
+    # v15.26 - Senuelo de dinero/premio sin contraprestacion.
     # Firma de la cadena viral (WhatsApp), el sorteo falso y el phishing
-    # de premio. NO es landing comercial ni tiene commercial_risk, así que
-    # ningún piso anterior la alcanza: con 14 módulos de peso ~0.07 el
-    # índice se quedaba en ~20 y el motor devolvía "bajo riesgo".
-    # `not news_like` evita castigar a la nota periodística que INFORMA
+    # de premio. NO es landing comercial ni tiene commercial_risk, asi que
+    # ningun piso anterior la alcanza: con 14 modulos de peso ~0.07 el
+    # indice se quedaba en ~20 y el motor devolvia "bajo riesgo".
+    # `not news_like` evita castigar a la nota periodistica que INFORMA
     # sobre la estafa (que usa el mismo vocabulario para denunciarla).
     if "wealth_lure_pattern" in promises_reasons and not news_like:
         return max(risk_score, 0.62)
 
-    if news_like and not financial_landing:
-        return risk_score
-
+    # A partir de aca news_like ya retorno arriba; estos pisos aplican solo a
+    # NO-noticias. Se mantienen los `not news_like` por defensa en profundidad.
+    #
     # El piso fuerte de commercial_risk "alto" (0.52) solo aplica si hay
-    # señal financiera/landing REAL (roi_detected o financial_landing), no
-    # por el mero nivel del módulo: commercial_risk puede dar "alto" por
-    # acumulación de ruido (cifras, banners de un portal), y sin esta
-    # condición una nota económica de un diario (ej. "84.717 visas") caía
+    # senal financiera/landing REAL (roi_detected o financial_landing), no
+    # por el mero nivel del modulo: commercial_risk puede dar "alto" por
+    # acumulacion de ruido (cifras, banners de un portal), y sin esta
+    # condicion una nota economica de un diario (ej. "84.717 visas") caia
     # en amarillo/rojo. Si el nivel es alto pero NO hay landing financiera,
-    # se lo trata como señal media (0.32), no como riesgo alto.
+    # se lo trata como senal media (0.32), no como riesgo alto.
     if comm_data.get("level") == "alto" and not news_like:
         if financial_landing or roi_detected:
             return max(risk_score, 0.52)
         return max(risk_score, 0.32)
 
-    # v15.28 — Compensación de la suba del corte bajo/medio (0.20→0.30):
+    # v15.28 - Compensacion de la suba del corte bajo/medio (0.20->0.30):
     # el ecommerce con urgencia real ("AHORRO FLASH", "SOLO X HOY")
-    # promedia ~0.25 y habría caído a verde. Si commercial_risk lo
+    # promedia ~0.25 y habria caido a verde. Si commercial_risk lo
     # clasifica medio, se lo sostiene en amarillo. `not news_like`
     # evita re-castigar a la nota que INFORMA sobre ofertas o estafas.
-    # Nota: la página antifraude del banco NO dispara commercial_risk,
-    # así que este piso no la alcanza — cae a verde, que es el objetivo.
     if comm_data.get("level") == "medio" and not news_like:
         return max(risk_score, 0.32)
 
