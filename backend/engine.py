@@ -41,7 +41,7 @@ GLOBAL_EXECUTOR = ThreadPoolExecutor(
 )
 
 
-ENGINE_VERSION = "15.31-news-floor-fix"
+ENGINE_VERSION = "15.32-domain-fix"
 
 # Fail-closed: si fallan más de este número de módulos ponderados,
 # el análisis no es confiable y se devuelve level "error" en vez de
@@ -319,8 +319,17 @@ def _map_risk_to_score(risk: float) -> int:
 
 
 def _domain(url: str) -> str:
+    # v15.32 - Normaliza URLs sin esquema. urlparse("iprofesional.com/x").netloc
+    # devuelve "" porque sin "://" interpreta TODO como path. La extension a
+    # veces manda la URL pelada (sin https://), y sin netloc el dominio no
+    # matcheaba NEWS_DOMAINS => _is_news_like daba False => el escudo de
+    # noticias no se aplicaba y notas periodisticas reales escalaban a "alto".
+    # Anteponer "//" fuerza a urlparse a leer el dominio como netloc.
     try:
-        return urlparse(url or "").netloc.lower()
+        u = (url or "").strip()
+        if u and "://" not in u and not u.startswith("//"):
+            u = "//" + u
+        return urlparse(u).netloc.lower()
     except Exception:
         return ""
 
