@@ -1,4 +1,4 @@
-// content_script.js — Chenuke v15.29
+// content_script.js — Chenuke v15.32
 // Extrae texto útil de páginas, landings, formularios y artículos.
 // NO modifica el DOM ni inyecta UI propia.
 //
@@ -10,6 +10,17 @@
 // sitios oficiales. Ahora: se saltan nodos dentro de script/style/etc.,
 // se prefiere innerText, y pushUnique descarta fragmentos con firma de
 // JS/CSS/markup.
+// v15.32: EXTRACCIÓN ACOTADA AL ARTÍCULO. Antes se barría TODA la página
+// (querySelectorAll sobre todo el body): en un portal de noticias eso
+// arrastraba la sidebar ("Más leídas", "Te puede interesar"), el menú y el
+// footer — títulos de OTRAS notas (dólar, bitcoin, trading) que no son la
+// nota abierta. Una nota de turismo de ~5.400 chars se mandaba como ~12.700,
+// y el ruido comercial de esas otras notas disparaba commercial_risk => la
+// nota daba "alto" falsamente. Ahora: si la página tiene un contenedor de
+// artículo real, se extrae SOLO de ahí; si no (landing, mensaje suelto,
+// estafa sin estructura), se cae al barrido completo de siempre para no
+// perder cobertura. Además se excluyen zonas de ruido (nav/aside/footer y
+// bloques "relacionadas/más leídas") en cualquier caso.
 
 'use strict';
 
@@ -45,6 +56,56 @@
   // crudo como "var ba147url=..." en el análisis. Se descartan a nivel
   // de elemento y de ancestro.
   const NOISE_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'CODE', 'PRE']);
+
+  // v15.32 — Contenedor del ARTÍCULO. Se prueba en orden; el primero que
+  // exista y tenga texto sustancial gana. Cubre la mayoría de CMS/diarios.
+  const ARTICLE_SELECTORS = [
+    '[itemprop="articleBody"]',
+    '[class*="article-content"]',   // iprofesional: "board board-article-content"
+    '[class*="article-body"]',
+    '[class*="article__body"]',
+    '[class*="articleBody"]',
+    '[class*="entry-content"]',
+    '[class*="post-content"]',
+    '[class*="nota-cuerpo"]',
+    '[class*="cuerpo-nota"]',
+    '[class*="nota-contenido"]',
+    '[class*="story-body"]',
+    '[class*="news-body"]',
+    'article',
+    'main article',
+    'main'
+  ];
+
+  // v15.32 — Zonas de RUIDO estructural: nunca son el cuerpo de la nota.
+  // Se excluyen tanto en modo artículo como en modo barrido completo.
+  const NOISE_CONTAINERS = 'nav, aside, header, footer, form';
+  // Bloques de "relacionadas / más leídas / seguinos" por texto de encabezado.
+  const NOISE_TEXT_HINTS = [
+    'te puede interesar', 'más leídas', 'mas leidas', 'más leído', 'mas leido',
+    'lo más visto', 'lo mas visto', 'seguinos', 'seguí leyendo', 'segui leyendo',
+    'notas relacionadas', 'también te puede', 'tambien te puede', 'newsletter',
+    'suscribite', 'suscríbete', 'suscribete'
+  ];
+
+  // ¿El elemento está dentro de una zona de ruido estructural?
+  function inNoiseContainer(el) {
+    return !!(el.closest && el.closest(NOISE_CONTAINERS));
+  }
+
+  // Busca el contenedor del artículo. Devuelve el elemento o null.
+  // Exige un mínimo de texto para no quedarse con un <article> decorativo
+  // vacío (algunos temas usan <article> para las tarjetas de la sidebar).
+  function findArticleRoot() {
+    for (const sel of ARTICLE_SELECTORS) {
+      let el;
+      try { el = document.querySelector(sel); } catch (_) { continue; }
+      if (!el) continue;
+      const len = (el.innerText || el.textContent || '').trim().length;
+      if (len >= 400) return el;
+    }
+    return null;
+  }
 
   function inNoiseNode(el) {
     let n = el;
@@ -92,12 +153,24 @@
   }
 
   function extractMainText(parts, seen) {
-    document.querySelectorAll(MAIN_SELECTORS).forEach((el) => {
+    // v15.32 — Si hay un artículo real, se recorre SOLO dentro de él. Así el
+    // texto es la nota y nada más (sin sidebar, "más leídas", menú ni footer).
+    // Si no hay artículo (landing, mensaje, estafa sin estructura), root es
+    // document y se mantiene el barrido completo de siempre.
+    const articleRoot = findArticleRoot();
+    const root = articleRoot || document;
+
+    root.querySelectorAll(MAIN_SELECTORS).forEach((el) => {
       if (inNoiseNode(el)) return;              // dentro de <script>/<style>/etc.
+      if (inNoiseContainer(el)) return;         // dentro de nav/aside/footer/form
+      const text = el.innerText || el.textContent || '';
+      if (!text) return;
+      // Descartar bloques de "relacionadas / más leídas / seguinos" por texto.
+      const low = text.toLowerCase();
+      if (NOISE_TEXT_HINTS.some((h) => low.startsWith(h))) return;
       // innerText respeta lo renderizado (ignora scripts); textContent NO,
       // por eso solo se cae a textContent si innerText viene realmente vacío
       // Y el resultado no parece código (lo filtra pushUnique igual).
-      const text = el.innerText || el.textContent || '';
       pushUnique(parts, seen, text, 20);
     });
   }
